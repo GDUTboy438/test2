@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "embedding": {
+    "recall_top_k": 12,
+    "recall_min_score": 0.45
+  },
+  "thresholds": {
+    "auto_apply": 0.8,
+    "pending_review": 0.6
+  },
+  "per_tag": {}
+}

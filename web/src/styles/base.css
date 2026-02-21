@@ -1,0 +1,67 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+@layer base {
+  html,
+  body,
+  #root {
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    background: var(--color-canvas);
+  }
+
+  .font-main {
+    font-family: "Inter", "Segoe UI", sans-serif;
+  }
+
+  .font-sidebar {
+    font-family: "Fira Sans", "Segoe UI", sans-serif;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app-page {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+
+.pvm-frame {
+  display: flex;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+
+.app-page[data-mode="visual"] {
+  height: 100vh;
+  justify-content: center;
+}
+
+.app-page[data-mode="live"] {
+  height: 100dvh;
+  justify-content: flex-start;
+}
+
+.pvm-frame[data-mode="visual"] {
+  width: var(--frame-width);
+  height: var(--frame-height);
+}
+
+.pvm-frame[data-mode="live"] {
+  width: 100vw;
+  height: 100dvh;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

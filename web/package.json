@@ -1,0 +1,35 @@
+{
+  "name": "pvm-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "visual:baseline": "node scripts/save-pen-baseline.mjs",
+    "visual:baseline:from-actual": "node scripts/save-pen-baseline.mjs --from-actual",
+    "visual:capture": "node scripts/visual-capture.mjs",
+    "visual:diff": "node scripts/visual-diff.mjs",
+    "visual:check": "npm run build && npm run visual:capture && npm run visual:diff"
+  },
+  "dependencies": {
+    "lucide-react": "^0.574.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

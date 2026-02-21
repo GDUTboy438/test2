@@ -1,0 +1,6 @@
+﻿node_modules/
+dist/
+*.tsbuildinfo
+visual/actual/*.png
+visual/diff/*.png
+visual/diff/*.json

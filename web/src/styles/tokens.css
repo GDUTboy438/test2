@@ -1,0 +1,43 @@
+﻿@import "tailwindcss";
+
+:root {
+  --frame-width: 1600px;
+  --frame-height: 920px;
+
+  --color-canvas: #f4f5f7;
+  --color-main-bg: #f8fafc;
+  --color-sidebar-bg: #111827;
+  --color-sidebar-top: #111827;
+  --color-sidebar-body: #111827;
+  --color-sidebar-divider: #ffffff1f;
+  --color-sidebar-card: #1a2431;
+  --color-sidebar-active: #9ca3af33;
+  --color-sidebar-brand: #e5e7eb;
+  --color-sidebar-accent: #b9a891;
+  --color-tree-main: #d1d5db;
+  --color-tree-sub: #9ca3af;
+  --color-user-name: #e8dbc9;
+  --color-user-role: #b7a58f;
+  --color-progress-text: #ede2d4;
+  --color-logo-glyph: #f3e8da;
+
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+  --color-border-soft: #eef2f7;
+  --color-primary: #111827;
+  --color-pill: #eef2f7;
+
+  --color-view-active-bg: #ffffff;
+  --color-view-active-text: #374151;
+  --color-view-active-icon: #111827;
+  --color-view-inactive-bg: #f3f4f6;
+  --color-view-inactive-text: #6b7280;
+
+  --color-filter-bg: #f8fafc;
+  --color-filter-border: #e2e8f0;
+  --color-filter-text: #334155;
+
+  --color-sort-bg: #1f2937;
+  --color-sort-border: #4b5563;
+  --color-sort-text: #ffffff;
+}

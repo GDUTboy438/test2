@@ -1,0 +1,24 @@
+# Virtual environments
+.venv/
+venv/
+
+# Local runtime/cache/temp
+%temp%/
+tmp/
+.mm/
+.mm_vendor/
+
+# Python cache/build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+dist/
+build/
+
+# Large local assets/tools not intended for source control
+tools/models/
+tools/ffmpeg/
+bge-large-zh-v1.5/
+
