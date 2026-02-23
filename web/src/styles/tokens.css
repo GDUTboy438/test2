@@ -40,4 +40,12 @@
   --color-sort-bg: #1f2937;
   --color-sort-border: #4b5563;
   --color-sort-text: #ffffff;
+
+  --color-settings-sidebar-bg: #111827;
+  --color-settings-divider: #ffffff1f;
+  --color-settings-active: #9ca3af33;
+  --color-settings-badge: #374151;
+  --color-tag-page-bg: #f3f4f6;
+  --color-tag-card: #ffffff;
+  --color-tag-border: #e5e7eb;
 }

@@ -40,6 +40,14 @@ class EntryOpenRequest(BaseModel):
     path: str
 
 
+class TagCreateRequest(BaseModel):
+    names: list[str]
+
+
+class TagIdListRequest(BaseModel):
+    ids: list[int]
+
+
 class ApiError(BaseModel):
     code: str
     message: str
@@ -109,6 +117,19 @@ app.add_middleware(
 
 runtime = ApiRuntime()
 service = build_service()
+
+REQUIRED_TAG_ROUTES = (
+    "/api/tags/library",
+    "/api/tags/library/create",
+    "/api/tags/library/delete",
+    "/api/tags/candidates",
+    "/api/tags/candidates/approve",
+    "/api/tags/candidates/reject",
+    "/api/tags/candidates/blacklist",
+    "/api/tags/candidates/requeue",
+    "/api/tags/candidates/clear-pending",
+    "/api/tags/blacklist",
+)
 
 
 def _auto_select_library() -> None:
@@ -279,6 +300,68 @@ def _pick_directory() -> str:
     return str(selected or "")
 
 
+def _ensure_library_selected() -> JSONResponse | None:
+    if not service.has_library():
+        return fail("NO_LIBRARY", "No library selected.")
+    return None
+
+
+def _clean_tag_names(names: list[str]) -> list[str]:
+    out: list[str] = []
+    seen = set()
+    for raw_name in list(names or []):
+        name = str(raw_name or "").strip()
+        key = name.lower()
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
+def _clean_tag_ids(ids: list[int]) -> list[int]:
+    return sorted({int(value) for value in list(ids or []) if int(value) > 0})
+
+
+def _parse_candidate_statuses(statuses: str) -> tuple[list[str] | None, str | None]:
+    raw = str(statuses or "").strip()
+    if not raw:
+        return None, None
+
+    allowed = {"pending", "approved", "blacklisted", "mapped"}
+    parsed = sorted({part.strip().lower() for part in raw.split(",") if part.strip()})
+    for part in parsed:
+        if part not in allowed:
+            return None, f"Unsupported candidate status: {part}"
+    return parsed, None
+
+
+def _collect_runtime_info() -> dict[str, Any]:
+    route_paths = sorted(
+        {
+            str(getattr(route, "path", ""))
+            for route in app.routes
+            if str(getattr(route, "path", "")).strip()
+        }
+    )
+    missing_routes = [
+        route
+        for route in REQUIRED_TAG_ROUTES
+        if route not in route_paths
+    ]
+    return {
+        "app_title": app.title,
+        "app_version": app.version,
+        "python_executable": sys.executable,
+        "cwd": str(Path.cwd()),
+        "api_file": str(Path(__file__).resolve()),
+        "route_count": len(route_paths),
+        "has_tag_routes": len(missing_routes) == 0,
+        "required_tag_routes": list(REQUIRED_TAG_ROUTES),
+        "missing_tag_routes": missing_routes,
+    }
+
+
 @app.post("/api/library/select")
 def select_library(payload: LibrarySelectRequest) -> JSONResponse:
     path = Path(payload.path).expanduser()
@@ -313,6 +396,11 @@ def current_library() -> JSONResponse:
     if root is None:
         return fail("NO_LIBRARY", "No library selected.")
     return ok({"name": service.library_name(), "root": str(root)})
+
+
+@app.get("/api/runtime/info")
+def runtime_info() -> JSONResponse:
+    return ok(_collect_runtime_info())
 
 
 @app.get("/api/directories")
@@ -369,6 +457,150 @@ def search_entries(q: str = Query("", min_length=1)) -> JSONResponse:
         return fail("NO_LIBRARY", "No library selected.")
     entries = service.search_video_entries(query=q)
     items = [_entry_to_video(entry) for entry in entries]
+    return ok({"items": items, "total": len(items)})
+
+
+@app.get("/api/tags/library")
+def list_tag_library() -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    items = service.list_tag_library()
+    return ok({"items": items, "total": len(items)})
+
+
+@app.post("/api/tags/library/create")
+def create_tag_library(payload: TagCreateRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    names = _clean_tag_names(payload.names)
+    if not names:
+        return fail("INVALID_PAYLOAD", "At least one tag name is required.")
+
+    created = service.create_tags(names)
+    return ok({"created": int(created)})
+
+
+@app.post("/api/tags/library/delete")
+def delete_tag_library(payload: TagIdListRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    tag_ids = _clean_tag_ids(payload.ids)
+    if not tag_ids:
+        return fail("INVALID_PAYLOAD", "At least one tag id is required.")
+
+    removed = service.delete_tags_by_ids(tag_ids)
+    return ok({"removed": int(removed)})
+
+
+@app.get("/api/tags/candidates")
+def list_tag_candidates(
+    statuses: str = Query("", description="Comma-separated statuses"),
+) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    parsed_statuses, status_error = _parse_candidate_statuses(statuses)
+    if status_error:
+        return fail("INVALID_QUERY", status_error)
+
+    items = service.list_tag_candidates(statuses=parsed_statuses)
+    return ok({"items": items, "total": len(items)})
+
+
+@app.post("/api/tags/candidates/approve")
+def approve_tag_candidates(payload: TagIdListRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    candidate_ids = _clean_tag_ids(payload.ids)
+    if not candidate_ids:
+        return fail("INVALID_PAYLOAD", "At least one candidate id is required.")
+
+    before_total = len(service.list_tag_library())
+    result = service.approve_tag_candidates(candidate_ids)
+    after_total = len(service.list_tag_library())
+
+    approved_candidates = int(result.get("approved_candidates") or 0)
+    linked_relations = int(result.get("applied_relations") or result.get("linked_relations") or 0)
+    created_tags = max(0, after_total - before_total)
+
+    return ok({
+        "approved_candidates": approved_candidates,
+        "created_tags": created_tags,
+        "linked_relations": linked_relations,
+    })
+
+
+@app.post("/api/tags/candidates/reject")
+def reject_tag_candidates(payload: TagIdListRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    candidate_ids = _clean_tag_ids(payload.ids)
+    if not candidate_ids:
+        return fail("INVALID_PAYLOAD", "At least one candidate id is required.")
+
+    rejected = service.reject_tag_candidates(candidate_ids)
+    return ok({"rejected": int(rejected)})
+
+
+@app.post("/api/tags/candidates/blacklist")
+def blacklist_tag_candidates(payload: TagIdListRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    candidate_ids = _clean_tag_ids(payload.ids)
+    if not candidate_ids:
+        return fail("INVALID_PAYLOAD", "At least one candidate id is required.")
+
+    result = service.blacklist_tag_candidates(candidate_ids)
+    return ok({
+        "blacklisted_candidates": int(result.get("blacklisted_candidates") or 0),
+        "blacklist_terms_added": int(result.get("blacklist_terms_added") or 0),
+    })
+
+
+@app.post("/api/tags/candidates/requeue")
+def requeue_tag_candidates(payload: TagIdListRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    candidate_ids = _clean_tag_ids(payload.ids)
+    if not candidate_ids:
+        return fail("INVALID_PAYLOAD", "At least one candidate id is required.")
+
+    requeued = service.requeue_tag_candidates(candidate_ids)
+    return ok({"requeued": int(requeued)})
+
+
+@app.post("/api/tags/candidates/clear-pending")
+def clear_pending_tag_candidates() -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    removed = service.clear_pending_tag_candidates()
+    return ok({"removed": int(removed)})
+
+
+@app.get("/api/tags/blacklist")
+def list_tag_blacklist() -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    items = service.list_tag_blacklist()
     return ok({"items": items, "total": len(items)})
 
 

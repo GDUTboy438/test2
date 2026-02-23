@@ -5,7 +5,7 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 
 const THRESHOLD = 0.02;
-const SCENES = ["5JcTk", "88L9O", "JrodX", "2L8Xf"];
+const SCENES = ["5JcTk", "88L9O", "JrodX", "2L8Xf", "J7vS3"];
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baselineDir = path.join(projectRoot, "visual", "baseline");
 const actualDir = path.join(projectRoot, "visual", "actual");
@@ -78,3 +78,4 @@ console.log(JSON.stringify(report, null, 2));
 if (!report.pass) {
   fail("Visual diff failed for one or more scenes.");
 }
+

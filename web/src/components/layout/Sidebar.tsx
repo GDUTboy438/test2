@@ -9,6 +9,7 @@ type SidebarProps = {
   scan: ScanProgressInfo;
   onSelectDirectory: (id: string) => void;
   onPickLibrary: () => void;
+  onOpenSettings: () => void;
   canInteract: boolean;
 };
 
@@ -119,6 +120,7 @@ export function Sidebar({
   scan,
   onSelectDirectory,
   onPickLibrary,
+  onOpenSettings,
   canInteract,
 }: SidebarProps) {
   const rootNode: DirectoryNode = treeRoot ?? {
@@ -176,6 +178,7 @@ export function Sidebar({
 
             <button
               type="button"
+              onClick={onOpenSettings}
               className="flex h-10 w-10 items-center justify-center rounded-full border-none bg-[var(--color-sidebar-active)] p-0"
               aria-label="settings"
             >

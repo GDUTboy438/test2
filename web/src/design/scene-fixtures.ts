@@ -2,11 +2,10 @@
   DirectoryNode,
   LibraryInfo,
   ScanProgressInfo,
-  SceneId,
   VideoItem,
   ViewMode,
 } from "../types/domain";
-
+import type { HomeSceneId } from "./frame-spec";
 type SceneFixture = {
   library: LibraryInfo;
   directories: DirectoryNode[];
@@ -225,7 +224,7 @@ const sampleVideos: VideoItem[] = [
   },
 ];
 
-const fixtures: Record<SceneId, SceneFixture> = {
+const fixtures: Record<HomeSceneId, SceneFixture> = {
   "5JcTk": {
     library,
     directories,
@@ -268,6 +267,8 @@ const fixtures: Record<SceneId, SceneFixture> = {
   },
 };
 
-export function getSceneFixture(sceneId: SceneId): SceneFixture {
+export function getSceneFixture(sceneId: HomeSceneId): SceneFixture {
   return JSON.parse(JSON.stringify(fixtures[sceneId])) as SceneFixture;
 }
+
+

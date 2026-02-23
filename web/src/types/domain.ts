@@ -1,4 +1,6 @@
-﻿export type SceneId = "5JcTk" | "88L9O" | "JrodX" | "2L8Xf";
+﻿export type SceneId = "5JcTk" | "88L9O" | "JrodX" | "2L8Xf" | "J7vS3";
+
+export type AppPage = "home" | "tag-manager";
 
 export type UiMode = "live" | "visual";
 
@@ -55,4 +57,38 @@ export type ScanProgressInfo = {
 export type ToastState = {
   tone: "success" | "error";
   message: string;
+};
+
+export type TagSource = "all" | "tag_library" | "candidate_library" | "blacklist";
+
+export type TagSection = "tag_library" | "candidate_library" | "blacklist";
+
+export type TagLibraryItem = {
+  id: number;
+  name: string;
+  usageCount: number;
+  manualUsageCount: number;
+  aiUsageCount: number;
+};
+
+export type TagCandidateStatus = "pending" | "approved" | "blacklisted" | "mapped";
+
+export type TagCandidateItem = {
+  id: number;
+  name: string;
+  status: TagCandidateStatus;
+  mappedTagId: number;
+  hitCount: number;
+  firstSeenEpoch: number;
+  lastSeenEpoch: number;
+};
+
+export type TagBlacklistItem = {
+  id: number;
+  term: string;
+  source: string;
+  reason: string;
+  hitCount: number;
+  firstSeenEpoch: number;
+  lastSeenEpoch: number;
 };
