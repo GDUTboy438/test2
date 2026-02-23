@@ -1,4 +1,5 @@
-﻿import { BreadcrumbRow } from "./components/layout/BreadcrumbRow";
+import { useCallback, useEffect, useState } from "react";
+import { BreadcrumbRow } from "./components/layout/BreadcrumbRow";
 import { DetailPanel } from "./components/layout/DetailPanel";
 import { FileGrid } from "./components/layout/FileGrid";
 import { FileTable } from "./components/layout/FileTable";
@@ -6,7 +7,10 @@ import { PaginationBar } from "./components/layout/PaginationBar";
 import { Sidebar } from "./components/layout/Sidebar";
 import { SubNav } from "./components/layout/SubNav";
 import { TopNav } from "./components/layout/TopNav";
+import { readPageFromUrl, setPageInUrl, subscribePopState } from "./navigation/page-route";
+import { TagManagerPage } from "./pages/TagManagerPage";
 import { useHomeState } from "./state/use-home-state";
+import type { AppPage } from "./types/domain";
 
 function EmptyState({ loading }: { loading: boolean }) {
   return (
@@ -18,7 +22,7 @@ function EmptyState({ loading }: { loading: boolean }) {
   );
 }
 
-export function App() {
+function HomePage({ onOpenTagManager }: { onOpenTagManager: () => void }) {
   const state = useHomeState();
   const contentGap = state.detailOpen ? 10 : 0;
 
@@ -39,6 +43,7 @@ export function App() {
           onPickLibrary={() => {
             void state.pickLibrary();
           }}
+          onOpenSettings={onOpenTagManager}
           canInteract={state.canInteract}
         />
 
@@ -156,4 +161,28 @@ export function App() {
       ) : null}
     </div>
   );
+}
+
+export function App() {
+  const [page, setPage] = useState<AppPage>(() => readPageFromUrl());
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("page")) {
+      setPageInUrl(page, true);
+    }
+  }, [page]);
+
+  useEffect(() => subscribePopState(() => setPage(readPageFromUrl())), []);
+
+  const navigatePage = useCallback((nextPage: AppPage) => {
+    setPageInUrl(nextPage);
+    setPage(nextPage);
+  }, []);
+
+  if (page === "tag-manager") {
+    return <TagManagerPage onBackToHome={() => navigatePage("home")} />;
+  }
+
+  return <HomePage onOpenTagManager={() => navigatePage("tag-manager")} />;
 }

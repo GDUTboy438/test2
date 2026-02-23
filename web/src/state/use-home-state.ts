@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { getFrameSpec, parseSceneId, sceneFromState } from "../design/frame-spec";
+import type { HomeSceneId } from "../design/frame-spec";
 import { getSceneFixture } from "../design/scene-fixtures";
 import {
   buildRootNode,
@@ -22,7 +23,6 @@ import type {
   FilterState,
   LibraryInfo,
   ScanProgressInfo,
-  SceneId,
   SortDirection,
   SortField,
   ToastState,
@@ -30,7 +30,6 @@ import type {
   VideoItem,
   ViewMode,
 } from "../types/domain";
-
 const PAGE_SIZE = 20;
 
 function readMode(): UiMode {
@@ -69,7 +68,7 @@ function applyFilters(items: VideoItem[], filters: FilterState): VideoItem[] {
 
 export type HomeState = {
   mode: UiMode;
-  scene: SceneId;
+  scene: HomeSceneId;
   frameName: string;
   viewMode: ViewMode;
   detailOpen: boolean;
@@ -406,4 +405,6 @@ export function useHomeState(): HomeState {
     playSelected,
   };
 }
+
+
 

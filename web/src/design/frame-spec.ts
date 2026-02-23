@@ -1,7 +1,9 @@
 ﻿import type { SceneId, ViewMode } from "../types/domain";
 
+export type HomeSceneId = Exclude<SceneId, "J7vS3">;
+
 export type FrameSpec = {
-  id: SceneId;
+  id: HomeSceneId;
   name: string;
   subNavHeight: 58 | 60;
   contentGap: number;
@@ -13,7 +15,7 @@ export type FrameSpec = {
   detailOpen: boolean;
 };
 
-const FRAME_SPEC_MAP: Record<SceneId, FrameSpec> = {
+const FRAME_SPEC_MAP: Record<HomeSceneId, FrameSpec> = {
   "5JcTk": {
     id: "5JcTk",
     name: "PVM Home Rebuild - UX Max Variant",
@@ -64,20 +66,21 @@ const FRAME_SPEC_MAP: Record<SceneId, FrameSpec> = {
   },
 };
 
-export const ALL_SCENES: SceneId[] = ["5JcTk", "88L9O", "JrodX", "2L8Xf"];
+export const HOME_SCENES: HomeSceneId[] = ["5JcTk", "88L9O", "JrodX", "2L8Xf"];
+export const VISUAL_SCENES: SceneId[] = [...HOME_SCENES, "J7vS3"];
 
-export function parseSceneId(input: string | null): SceneId {
+export function parseSceneId(input: string | null): HomeSceneId {
   if (input === "5JcTk" || input === "88L9O" || input === "JrodX" || input === "2L8Xf") {
     return input;
   }
   return "88L9O";
 }
 
-export function getFrameSpec(sceneId: SceneId): FrameSpec {
+export function getFrameSpec(sceneId: HomeSceneId): FrameSpec {
   return FRAME_SPEC_MAP[sceneId];
 }
 
-export function sceneFromState(viewMode: ViewMode, detailOpen: boolean): SceneId {
+export function sceneFromState(viewMode: ViewMode, detailOpen: boolean): HomeSceneId {
   if (viewMode === "list" && !detailOpen) {
     return "5JcTk";
   }
