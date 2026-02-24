@@ -1,6 +1,8 @@
-﻿export type SceneId = "5JcTk" | "88L9O" | "JrodX" | "2L8Xf" | "J7vS3";
+export type SceneId = "5JcTk" | "88L9O" | "JrodX" | "2L8Xf" | "J7vS3" | "CIBf0" | "Hyzda";
 
-export type AppPage = "home" | "tag-manager";
+export type AppPage = "home" | "settings";
+
+export type SettingsModule = "tag-manager" | "logs-analysis";
 
 export type UiMode = "live" | "visual";
 
@@ -91,4 +93,57 @@ export type TagBlacklistItem = {
   hitCount: number;
   firstSeenEpoch: number;
   lastSeenEpoch: number;
+};
+
+export type LogSource = "scan" | "tag_mining" | "app_runtime";
+
+export type LogSourceOption = {
+  source: LogSource;
+  label: string;
+};
+
+export type LogFileItem = {
+  logId: string;
+  fileName: string;
+  source: LogSource;
+  mtimeEpoch: number;
+  sizeBytes: number;
+  mtimeLabel: string;
+  sizeLabel: string;
+};
+
+export type LogEventItem = {
+  lineNo: number;
+  tsEpoch: number;
+  timeLabel: string;
+  level: string;
+  event: string;
+  relPath: string;
+  summary: string;
+  payload: Record<string, unknown>;
+};
+
+export type LogAnalysisSummary = {
+  source: LogSource;
+  logId: string;
+  total: number;
+  errorCount: number;
+  parseErrorCount: number;
+  lastErrorTs: number | null;
+  lastErrorLabel: string;
+  topEvents: Array<{ event: string; count: number }>;
+};
+
+export type LogsFilterState = {
+  q: string;
+  level: string;
+  event: string;
+  fromTs: number | null;
+  toTs: number | null;
+};
+
+export type LogsPaginationState = {
+  page: number;
+  pageSize: number;
+  total: number;
 };

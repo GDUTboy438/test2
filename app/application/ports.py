@@ -200,3 +200,25 @@ class TagMiningLoggerPort(Protocol):
     def latest_log_path(self) -> Optional[Path]: ...
 
     def read_log(self, log_path: Path) -> list[Dict[str, Any]]: ...
+
+
+class AppRuntimeLoggerPort(Protocol):
+    def set_library_root(self, root: Path) -> None: ...
+
+    def log_event(
+        self,
+        event: str,
+        *,
+        level: str = "info",
+        module: str = "",
+        action: str = "",
+        message: str = "",
+        payload: Optional[Dict[str, Any]] = None,
+        request_id: str = "",
+    ) -> None: ...
+
+    def list_logs(self, limit: int = 30) -> list[Path]: ...
+
+    def latest_log_path(self) -> Optional[Path]: ...
+
+    def read_log(self, log_path: Path) -> list[Dict[str, Any]]: ...

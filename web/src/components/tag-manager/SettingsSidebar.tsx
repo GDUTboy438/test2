@@ -1,24 +1,36 @@
-﻿import { LayoutGrid, Settings } from "lucide-react";
+import { LayoutGrid, Settings } from "lucide-react";
+import type { SettingsModule } from "../../types/domain";
 
 type SettingsSidebarProps = {
   brand: string;
+  activeModule: SettingsModule;
+  onModuleChange: (module: SettingsModule) => void;
 };
 
 type ModuleStatus = {
+  key:
+    | "user-login"
+    | "tag-manager"
+    | "library-sources"
+    | "feature-extraction"
+    | "model-management"
+    | "ebook-mode"
+    | "logs-analysis"
+    | "data-backup";
   label: string;
   hint: string;
-  active?: boolean;
+  module?: SettingsModule;
 };
 
 const MODULES: ModuleStatus[] = [
-  { label: "用户登录", hint: "规划中" },
-  { label: "标签管理", hint: "服务就绪/API待接入", active: true },
-  { label: "资源库来源", hint: "部分支持" },
-  { label: "特征提取", hint: "部分支持" },
-  { label: "模型管理", hint: "工具可用/API待接入" },
-  { label: "电子书模式", hint: "规划中" },
-  { label: "任务与日志", hint: "服务就绪/API待接入" },
-  { label: "数据与备份", hint: "规划中" },
+  { key: "user-login", label: "用户登录", hint: "规划中" },
+  { key: "tag-manager", label: "标签管理", hint: "服务就绪/API待接入", module: "tag-manager" },
+  { key: "library-sources", label: "资源库来源", hint: "部分支持" },
+  { key: "feature-extraction", label: "特征提取", hint: "部分支持" },
+  { key: "model-management", label: "模型管理", hint: "工具可用/API待接入" },
+  { key: "ebook-mode", label: "电子书模式", hint: "规划中" },
+  { key: "logs-analysis", label: "日志分析", hint: "服务就绪/API待接入", module: "logs-analysis" },
+  { key: "data-backup", label: "数据与备份", hint: "规划中" },
 ];
 
 function StatusBadge({ text, active }: { text: string; active: boolean }) {
@@ -33,7 +45,7 @@ function StatusBadge({ text, active }: { text: string; active: boolean }) {
   );
 }
 
-export function SettingsSidebar({ brand }: SettingsSidebarProps) {
+export function SettingsSidebar({ brand, activeModule, onModuleChange }: SettingsSidebarProps) {
   return (
     <aside className="flex h-full w-[310px] flex-col bg-[#111827]" data-testid="tag-manager-settings-sidebar">
       <div className="flex h-[88px] items-center gap-3 px-[18px]">
@@ -54,22 +66,35 @@ export function SettingsSidebar({ brand }: SettingsSidebarProps) {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <nav className="min-h-0 flex-1 space-y-[10px] overflow-y-auto pr-1 pt-3">
-            {MODULES.map((module) => (
-              <button
-                key={module.label}
-                type="button"
-                className={`flex h-[46px] w-full items-center justify-between rounded-[10px] border-none px-3 text-left ${
-                  module.active ? "bg-[#9CA3AF33]" : "bg-transparent"
-                }`}
-              >
-                <span
-                  className={`font-sidebar text-[14px] font-bold ${module.active ? "text-[#F3F4F6]" : "text-[#D1D5DB]"}`}
+            {MODULES.map((module) => {
+              const isActive = module.module === activeModule;
+              const clickable = Boolean(module.module);
+
+              return (
+                <button
+                  key={module.key}
+                  type="button"
+                  onClick={() => {
+                    if (!module.module) {
+                      return;
+                    }
+                    onModuleChange(module.module);
+                  }}
+                  className={`flex h-[46px] w-full items-center justify-between rounded-[10px] border-none px-3 text-left ${
+                    isActive ? "bg-[#9CA3AF33]" : "bg-transparent"
+                  } ${clickable ? "cursor-pointer" : "cursor-default"}`}
                 >
-                  {module.label}
-                </span>
-                <StatusBadge text={module.hint} active={Boolean(module.active)} />
-              </button>
-            ))}
+                  <span
+                    className={`font-sidebar text-[14px] font-bold ${
+                      isActive ? "text-[#F3F4F6]" : "text-[#D1D5DB]"
+                    }`}
+                  >
+                    {module.label}
+                  </span>
+                  <StatusBadge text={module.hint} active={isActive} />
+                </button>
+              );
+            })}
           </nav>
 
           <div className="mt-[10px] shrink-0 flex flex-col gap-[10px]">

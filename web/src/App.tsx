@@ -7,10 +7,10 @@ import { PaginationBar } from "./components/layout/PaginationBar";
 import { Sidebar } from "./components/layout/Sidebar";
 import { SubNav } from "./components/layout/SubNav";
 import { TopNav } from "./components/layout/TopNav";
-import { readPageFromUrl, setPageInUrl, subscribePopState } from "./navigation/page-route";
-import { TagManagerPage } from "./pages/TagManagerPage";
+import { readRouteFromUrl, setRouteInUrl, subscribePopState, type AppRoute } from "./navigation/page-route";
+import { SettingsPage } from "./pages/SettingsPage";
 import { useHomeState } from "./state/use-home-state";
-import type { AppPage } from "./types/domain";
+import type { UiMode } from "./types/domain";
 
 function EmptyState({ loading }: { loading: boolean }) {
   return (
@@ -22,7 +22,7 @@ function EmptyState({ loading }: { loading: boolean }) {
   );
 }
 
-function HomePage({ onOpenTagManager }: { onOpenTagManager: () => void }) {
+function HomePage({ onOpenSettings }: { onOpenSettings: () => void }) {
   const state = useHomeState();
   const contentGap = state.detailOpen ? 10 : 0;
 
@@ -43,7 +43,7 @@ function HomePage({ onOpenTagManager }: { onOpenTagManager: () => void }) {
           onPickLibrary={() => {
             void state.pickLibrary();
           }}
-          onOpenSettings={onOpenTagManager}
+          onOpenSettings={onOpenSettings}
           canInteract={state.canInteract}
         />
 
@@ -164,25 +164,41 @@ function HomePage({ onOpenTagManager }: { onOpenTagManager: () => void }) {
 }
 
 export function App() {
-  const [page, setPage] = useState<AppPage>(() => readPageFromUrl());
+  const [route, setRoute] = useState<AppRoute>(() => readRouteFromUrl());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has("page")) {
-      setPageInUrl(page, true);
+    const pageFromQuery = params.get("page");
+    const moduleFromQuery = params.get("module");
+    const modeFromQuery = params.get("mode");
+    const needRewrite =
+      pageFromQuery !== route.page ||
+      (route.page === "settings" && moduleFromQuery !== route.module) ||
+      !modeFromQuery;
+
+    if (needRewrite) {
+      setRouteInUrl(route, true);
     }
-  }, [page]);
+  }, [route]);
 
-  useEffect(() => subscribePopState(() => setPage(readPageFromUrl())), []);
+  useEffect(() => subscribePopState(() => setRoute(readRouteFromUrl())), []);
 
-  const navigatePage = useCallback((nextPage: AppPage) => {
-    setPageInUrl(nextPage);
-    setPage(nextPage);
+  const navigateRoute = useCallback((nextRoute: AppRoute) => {
+    setRouteInUrl(nextRoute);
+    setRoute(nextRoute);
   }, []);
 
-  if (page === "tag-manager") {
-    return <TagManagerPage onBackToHome={() => navigatePage("home")} />;
+  if (route.page === "settings") {
+    const mode: UiMode = new URLSearchParams(window.location.search).get("mode") === "visual" ? "visual" : "live";
+    return (
+      <SettingsPage
+        module={route.module}
+        mode={mode}
+        onModuleChange={(module) => navigateRoute({ page: "settings", module })}
+        onBackToHome={() => navigateRoute({ page: "home", module: "tag-manager" })}
+      />
+    );
   }
 
-  return <HomePage onOpenTagManager={() => navigatePage("tag-manager")} />;
+  return <HomePage onOpenSettings={() => navigateRoute({ page: "settings", module: "tag-manager" })} />;
 }

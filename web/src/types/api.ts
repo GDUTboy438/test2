@@ -118,3 +118,63 @@ export type IdListPayload = {
 export type CreateTagsPayload = {
   names: string[];
 };
+
+export type ApiLogSource = "scan" | "tag_mining" | "app_runtime";
+
+export type ApiLogSourceOption = {
+  source: ApiLogSource;
+  label: string;
+};
+
+export type ApiLogSourcesData = {
+  items: ApiLogSourceOption[];
+  default_source: ApiLogSource;
+};
+
+export type ApiLogFileItem = {
+  log_id: string;
+  file_name: string;
+  source: ApiLogSource;
+  mtime_epoch: number;
+  size_bytes: number;
+};
+
+export type ApiLogFilesData = {
+  source: ApiLogSource;
+  items: ApiLogFileItem[];
+  total: number;
+};
+
+export type ApiLogLatestData = {
+  source: ApiLogSource;
+  item: ApiLogFileItem | null;
+};
+
+export type ApiLogEventItem = {
+  line_no: number;
+  ts_epoch: number;
+  level: string;
+  event: string;
+  rel_path: string;
+  summary: string;
+  payload: Record<string, unknown>;
+};
+
+export type ApiLogEventsData = {
+  source: ApiLogSource;
+  log_id: string;
+  total: number;
+  page: number;
+  page_size: number;
+  items: ApiLogEventItem[];
+};
+
+export type ApiLogAnalysisData = {
+  source: ApiLogSource;
+  log_id: string;
+  total: number;
+  error_count: number;
+  parse_error_count: number;
+  last_error_ts: number | null;
+  top_events: Array<{ event: string; count: number }>;
+};
