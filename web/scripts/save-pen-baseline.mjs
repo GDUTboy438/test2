@@ -2,7 +2,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SCENES = ["5JcTk", "88L9O", "JrodX", "2L8Xf", "J7vS3"];
+const SCENES = ["5JcTk", "88L9O", "JrodX", "2L8Xf", "J7vS3", "CIBf0", "Hyzda"];
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baselineDir = path.join(projectRoot, "visual", "baseline");
 const actualDir = path.join(projectRoot, "visual", "actual");
