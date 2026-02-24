@@ -21,6 +21,7 @@ if str(_project_root) not in sys.path:
 
 from app.application.library_service import LibraryService
 from app.application.models import ExplorerEntry, ScanProgress
+from app.infrastructure.app_runtime_logger import JsonlAppRuntimeLogger
 from app.infrastructure.embedding_model import LocalSentenceTransformerModel
 from app.infrastructure.file_opener import DefaultFileOpener
 from app.infrastructure.library_repository import SqliteLibraryRepository
@@ -89,6 +90,7 @@ class ApiRuntime:
 def build_service() -> LibraryService:
     scan_logger = JsonlScanLogger()
     tag_logger = JsonlTagMiningLogger()
+    runtime_logger = JsonlAppRuntimeLogger()
     embedding_model = LocalSentenceTransformerModel()
     reranker_model = LocalBgeRerankerModel()
     tokenizer = PkusegTokenizer()
@@ -99,6 +101,7 @@ def build_service() -> LibraryService:
         opener=DefaultFileOpener(),
         scan_logger=scan_logger,
         tag_mining_logger=tag_logger,
+        runtime_logger=runtime_logger,
         embedding_model=embedding_model,
         reranker_model=reranker_model,
         tokenizer=tokenizer,
@@ -130,6 +133,8 @@ REQUIRED_TAG_ROUTES = (
     "/api/tags/candidates/clear-pending",
     "/api/tags/blacklist",
 )
+
+LOG_SOURCES = ("scan", "tag_mining", "app_runtime")
 
 
 def _auto_select_library() -> None:
@@ -334,6 +339,24 @@ def _parse_candidate_statuses(statuses: str) -> tuple[list[str] | None, str | No
         if part not in allowed:
             return None, f"Unsupported candidate status: {part}"
     return parsed, None
+
+
+def _parse_log_source(source: str) -> tuple[str | None, str | None]:
+    value = str(source or "").strip().lower()
+    if value in LOG_SOURCES:
+        return value, None
+    return None, f"Unsupported log source: {source}"
+
+
+def _to_log_file_meta(log_path: Path, source: str) -> dict[str, Any]:
+    stat = log_path.stat()
+    return {
+        "log_id": log_path.name,
+        "file_name": log_path.name,
+        "source": source,
+        "mtime_epoch": int(stat.st_mtime),
+        "size_bytes": int(stat.st_size),
+    }
 
 
 def _collect_runtime_info() -> dict[str, Any]:
@@ -602,6 +625,136 @@ def list_tag_blacklist() -> JSONResponse:
 
     items = service.list_tag_blacklist()
     return ok({"items": items, "total": len(items)})
+
+
+@app.get("/api/logs/sources")
+def list_log_sources() -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+    return ok(
+        {
+            "items": [
+                {"source": "scan", "label": "扫描日志"},
+                {"source": "tag_mining", "label": "标签提取日志"},
+                {"source": "app_runtime", "label": "项目运行日志"},
+            ],
+            "default_source": "app_runtime",
+        }
+    )
+
+
+@app.get("/api/logs/files")
+def list_log_files(
+    source: str = Query("app_runtime", description="scan|tag_mining|app_runtime"),
+    limit: int = Query(30, ge=1, le=2000),
+) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    source_key, source_error = _parse_log_source(source)
+    if source_error:
+        return fail("INVALID_QUERY", source_error)
+
+    files = service.list_logs(source=source_key, limit=limit)
+    items = [_to_log_file_meta(path, source_key) for path in files]
+    return ok({"source": source_key, "items": items, "total": len(items)})
+
+
+@app.get("/api/logs/latest")
+def latest_log_file(source: str = Query("app_runtime", description="scan|tag_mining|app_runtime")) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    source_key, source_error = _parse_log_source(source)
+    if source_error:
+        return fail("INVALID_QUERY", source_error)
+
+    latest = service.latest_log(source_key)
+    item = _to_log_file_meta(latest, source_key) if latest is not None else None
+    return ok({"source": source_key, "item": item})
+
+
+@app.get("/api/logs/events")
+def list_log_events(
+    source: str = Query("app_runtime", description="scan|tag_mining|app_runtime"),
+    log_id: str = Query("", description="Log filename"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=200),
+    level: str = Query("", description="info|error"),
+    event: str = Query("", description="Exact event name"),
+    q: str = Query("", description="Keyword search"),
+    from_ts: Optional[int] = Query(None, description="Inclusive epoch lower bound"),
+    to_ts: Optional[int] = Query(None, description="Inclusive epoch upper bound"),
+) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    source_key, source_error = _parse_log_source(source)
+    if source_error:
+        return fail("INVALID_QUERY", source_error)
+    if from_ts is not None and to_ts is not None and from_ts > to_ts:
+        return fail("INVALID_QUERY", "from_ts must be <= to_ts")
+
+    try:
+        data = service.read_log_events(
+            source=source_key,
+            log_id=log_id,
+            page=page,
+            page_size=page_size,
+            level=level,
+            event=event,
+            q=q,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except ValueError as exc:
+        return fail("INVALID_QUERY", str(exc))
+    except FileNotFoundError:
+        return fail("LOG_NOT_FOUND", "Requested log file was not found.", status=404)
+
+    return ok(data)
+
+
+@app.get("/api/logs/analysis")
+def analyze_log_events(
+    source: str = Query("app_runtime", description="scan|tag_mining|app_runtime"),
+    log_id: str = Query("", description="Log filename"),
+    level: str = Query("", description="info|error"),
+    event: str = Query("", description="Exact event name"),
+    q: str = Query("", description="Keyword search"),
+    from_ts: Optional[int] = Query(None, description="Inclusive epoch lower bound"),
+    to_ts: Optional[int] = Query(None, description="Inclusive epoch upper bound"),
+) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    source_key, source_error = _parse_log_source(source)
+    if source_error:
+        return fail("INVALID_QUERY", source_error)
+    if from_ts is not None and to_ts is not None and from_ts > to_ts:
+        return fail("INVALID_QUERY", "from_ts must be <= to_ts")
+
+    try:
+        data = service.analyze_log_events(
+            source=source_key,
+            log_id=log_id,
+            level=level,
+            event=event,
+            q=q,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except ValueError as exc:
+        return fail("INVALID_QUERY", str(exc))
+    except FileNotFoundError:
+        return fail("LOG_NOT_FOUND", "Requested log file was not found.", status=404)
+
+    return ok(data)
 
 
 @app.get("/api/scan/progress")

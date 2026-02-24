@@ -16,6 +16,7 @@ bootstrap_windows_dll_paths()
 from PySide6.QtWidgets import QApplication
 
 from app.application.library_service import LibraryService
+from app.infrastructure.app_runtime_logger import JsonlAppRuntimeLogger
 from app.infrastructure.file_opener import DefaultFileOpener
 from app.infrastructure.embedding_model import LocalSentenceTransformerModel
 from app.infrastructure.reranker_model import LocalBgeRerankerModel
@@ -31,6 +32,7 @@ from app.ui.main_window import MainWindow
 def main() -> int:
     scan_logger = JsonlScanLogger()
     tag_logger = JsonlTagMiningLogger()
+    runtime_logger = JsonlAppRuntimeLogger()
     embedding_model = LocalSentenceTransformerModel()
     reranker_model = LocalBgeRerankerModel()
     tokenizer = PkusegTokenizer()
@@ -41,6 +43,7 @@ def main() -> int:
         opener=DefaultFileOpener(),
         scan_logger=scan_logger,
         tag_mining_logger=tag_logger,
+        runtime_logger=runtime_logger,
         embedding_model=embedding_model,
         reranker_model=reranker_model,
         tokenizer=tokenizer,

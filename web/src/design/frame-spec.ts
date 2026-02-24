@@ -1,6 +1,6 @@
 ﻿import type { SceneId, ViewMode } from "../types/domain";
 
-export type HomeSceneId = Exclude<SceneId, "J7vS3">;
+export type HomeSceneId = Exclude<SceneId, "J7vS3" | "CIBf0" | "Hyzda">;
 
 export type FrameSpec = {
   id: HomeSceneId;
@@ -67,7 +67,7 @@ const FRAME_SPEC_MAP: Record<HomeSceneId, FrameSpec> = {
 };
 
 export const HOME_SCENES: HomeSceneId[] = ["5JcTk", "88L9O", "JrodX", "2L8Xf"];
-export const VISUAL_SCENES: SceneId[] = [...HOME_SCENES, "J7vS3"];
+export const VISUAL_SCENES: SceneId[] = [...HOME_SCENES, "J7vS3", "CIBf0", "Hyzda"];
 
 export function parseSceneId(input: string | null): HomeSceneId {
   if (input === "5JcTk" || input === "88L9O" || input === "JrodX" || input === "2L8Xf") {
