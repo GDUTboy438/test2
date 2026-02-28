@@ -54,6 +54,7 @@ function HomePage({ onOpenSettings }: { onOpenSettings: () => void }) {
             onPickLibrary={() => {
               void state.pickLibrary();
             }}
+            onOpenSettings={onOpenSettings}
             canInteract={state.canInteract}
           />
           <div className="h-px w-full bg-[var(--color-border)]" />
@@ -171,10 +172,11 @@ export function App() {
     const pageFromQuery = params.get("page");
     const moduleFromQuery = params.get("module");
     const modeFromQuery = params.get("mode");
+    const normalizedMode = modeFromQuery === "visual" && params.has("scene") ? "visual" : "live";
     const needRewrite =
       pageFromQuery !== route.page ||
       (route.page === "settings" && moduleFromQuery !== route.module) ||
-      !modeFromQuery;
+      modeFromQuery !== normalizedMode;
 
     if (needRewrite) {
       setRouteInUrl(route, true);
@@ -189,7 +191,8 @@ export function App() {
   }, []);
 
   if (route.page === "settings") {
-    const mode: UiMode = new URLSearchParams(window.location.search).get("mode") === "visual" ? "visual" : "live";
+    const params = new URLSearchParams(window.location.search);
+    const mode: UiMode = params.get("mode") === "visual" && params.has("scene") ? "visual" : "live";
     return (
       <SettingsPage
         module={route.module}

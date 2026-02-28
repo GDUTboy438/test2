@@ -1,3 +1,4 @@
+import { FeatureExtractionPageContent } from "../components/feature-extraction/FeatureExtractionPageContent";
 import { LogsAnalysisPageContent } from "../components/logs-analysis/LogsAnalysisPageContent";
 import { SettingsSidebar } from "../components/tag-manager/SettingsSidebar";
 import { TagManagerHeader } from "../components/tag-manager/TagManagerHeader";
@@ -11,11 +12,16 @@ type SettingsPageProps = {
   onBackToHome: () => void;
 };
 
-const HEADER_META: Record<SettingsModule, { title: string; subtitle: string; scene: "J7vS3" | "CIBf0" }> = {
+const HEADER_META: Record<SettingsModule, { title: string; subtitle: string; scene: "J7vS3" | "CIBf0" | "FEx01" }> = {
   "tag-manager": {
     title: "标签管理",
     subtitle: "标签的创建、检索与批量维护。",
     scene: "J7vS3",
+  },
+  "feature-extraction": {
+    title: "特征提取",
+    subtitle: "模型切换、任务执行与本地模型管理。",
+    scene: "FEx01",
   },
   "logs-analysis": {
     title: "日志分析",
@@ -30,7 +36,9 @@ export function SettingsPage({ module, mode, onModuleChange, onBackToHome }: Set
   const activeScene =
     module === "logs-analysis" && (sceneParam === "CIBf0" || sceneParam === "Hyzda")
       ? sceneParam
-      : meta.scene;
+      : module === "feature-extraction" && (sceneParam === "FEx01" || sceneParam === "hFUDa")
+        ? sceneParam
+        : meta.scene;
 
   return (
     <div className="app-page" data-mode={mode}>
@@ -41,7 +49,13 @@ export function SettingsPage({ module, mode, onModuleChange, onBackToHome }: Set
           <TagManagerHeader title={meta.title} subtitle={meta.subtitle} onBackToLibrary={onBackToHome} />
           <div className="h-px w-full bg-[#E5E7EB]" />
 
-          {module === "tag-manager" ? <TagManagerPageContent /> : <LogsAnalysisPageContent />}
+          {module === "tag-manager" ? (
+            <TagManagerPageContent />
+          ) : module === "feature-extraction" ? (
+            <FeatureExtractionPageContent />
+          ) : (
+            <LogsAnalysisPageContent />
+          )}
         </main>
       </div>
     </div>

@@ -27,6 +27,8 @@ export function TagManagerPageContent() {
             selectedTagIds={state.selectedTagIds}
             selectedCandidateIds={state.selectedCandidateIds}
             selectedBlacklistIds={state.selectedBlacklistIds}
+            highlightedTagIds={state.highlightedTagIds}
+            highlightedCandidateIds={state.highlightedCandidateIds}
             onToggleTag={state.toggleTagSelection}
             onToggleCandidate={state.toggleCandidateSelection}
             onToggleBlacklist={state.toggleBlacklistSelection}
@@ -42,6 +44,8 @@ export function TagManagerPageContent() {
             selectedTagIds={state.selectedTagIds}
             selectedCandidateIds={state.selectedCandidateIds}
             selectedBlacklistIds={state.selectedBlacklistIds}
+            highlightedTagIds={state.highlightedTagIds}
+            highlightedCandidateIds={state.highlightedCandidateIds}
             onSetSection={state.setActiveSection}
             onToggleTag={state.toggleTagSelection}
             onToggleCandidate={state.toggleCandidateSelection}

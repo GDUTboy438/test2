@@ -21,8 +21,9 @@ import type {
 const DEFAULT_PAGE_SIZE = 100;
 
 function readMode(): UiMode {
-  const mode = new URLSearchParams(window.location.search).get("mode");
-  return mode === "visual" ? "visual" : "live";
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+  return mode === "visual" && params.has("scene") ? "visual" : "live";
 }
 
 function readLogsScene(): LogsAnalysisSceneId {

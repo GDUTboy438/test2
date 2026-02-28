@@ -1,8 +1,17 @@
-export type SceneId = "5JcTk" | "88L9O" | "JrodX" | "2L8Xf" | "J7vS3" | "CIBf0" | "Hyzda";
+export type SceneId =
+  | "5JcTk"
+  | "88L9O"
+  | "JrodX"
+  | "2L8Xf"
+  | "J7vS3"
+  | "CIBf0"
+  | "Hyzda"
+  | "FEx01"
+  | "hFUDa";
 
 export type AppPage = "home" | "settings";
 
-export type SettingsModule = "tag-manager" | "logs-analysis";
+export type SettingsModule = "tag-manager" | "feature-extraction" | "logs-analysis";
 
 export type UiMode = "live" | "visual";
 

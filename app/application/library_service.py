@@ -205,12 +205,20 @@ class LibraryService:
         min_df: int = 2,
         max_tags_per_video: int = 8,
         max_terms: int = 400,
+        recall_top_k: Optional[int] = None,
+        recall_min_score: Optional[float] = None,
+        auto_apply: Optional[float] = None,
+        pending_review: Optional[float] = None,
+        embedding_model: Optional[EmbeddingModelPort] = None,
+        reranker_model: Optional[RerankerModelPort] = None,
         should_stop: Optional[Callable[[], bool]] = None,
         strategy: str = "auto",
         scope: str = "all",
     ) -> TagMiningResult:
         if self._tag_mining_logger is None:
             raise RuntimeError("未配置标签提取日志器")
+        active_embedding_model = embedding_model or self._embedding_model
+        active_reranker_model = reranker_model or self._reranker_model
         self._runtime_log(
             event="tag_mining_start",
             action="mine_title_tags",
@@ -221,14 +229,20 @@ class LibraryService:
                 "min_df": int(min_df),
                 "max_tags_per_video": int(max_tags_per_video),
                 "max_terms": int(max_terms),
+                "recall_top_k": int(recall_top_k) if recall_top_k is not None else None,
+                "recall_min_score": float(recall_min_score) if recall_min_score is not None else None,
+                "auto_apply": float(auto_apply) if auto_apply is not None else None,
+                "pending_review": float(pending_review) if pending_review is not None else None,
+                "embedding_model_override": active_embedding_model is not None,
+                "reranker_model_override": active_reranker_model is not None,
             },
         )
         try:
             result = TitleTagMiningService(
                 repository=self._repo,
                 logger=self._tag_mining_logger,
-                embedding_model=self._embedding_model,
-                reranker_model=self._reranker_model,
+                embedding_model=active_embedding_model,
+                reranker_model=active_reranker_model,
                 tag_generator_model=self._tag_generator_model,
                 tokenizer=self._tokenizer,
             ).mine(
@@ -236,6 +250,10 @@ class LibraryService:
                 min_df=min_df,
                 max_tags_per_video=max_tags_per_video,
                 max_terms=max_terms,
+                recall_top_k=recall_top_k,
+                recall_min_score=recall_min_score,
+                auto_apply=auto_apply,
+                pending_review=pending_review,
                 should_stop=should_stop,
                 strategy=strategy,
                 scope=scope,
@@ -427,7 +445,10 @@ class LibraryService:
 
     def approve_tag_candidates(self, candidate_ids: list[int]) -> Dict[str, int]:
         result = self._repo.approve_tag_candidates(candidate_ids)
-        if int(result.get("approved_candidates") or 0) > 0:
+        if (
+            int(result.get("approved_candidates") or 0) > 0
+            or int(result.get("applied_relations") or 0) > 0
+        ):
             self.rebuild_index()
         self._runtime_log(
             event="tag_candidates_approved",
@@ -828,6 +849,12 @@ class LibraryService:
             return f"Tag mining summary: {str(event.get('summary') or '')[:180]}"
         if event_name == "tag_mining_error":
             return f"Tag mining error: {str(event.get('error') or '')[:160]}"
+        if event_name == "dependency_loaded":
+            status = str(event.get("status") or "unknown")
+            reason = str(event.get("reason") or "").strip()
+            if reason:
+                return f"Dependencies {status}: {reason}"
+            return f"Dependencies {status}"
         if event_name == "parse_error":
             return "Invalid JSON line."
         if event_name.startswith("tag_candidates_"):
