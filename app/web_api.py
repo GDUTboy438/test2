@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import os
+import re
 import sys
 import threading
 import time
@@ -20,7 +21,8 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from app.application.library_service import LibraryService
-from app.application.models import ExplorerEntry, ScanProgress
+from app.application.models import ExplorerEntry, ScanProgress, TagMiningProgress, TagMiningResult
+from app.application.ports import EmbeddingModelPort, RerankerModelPort
 from app.infrastructure.app_runtime_logger import JsonlAppRuntimeLogger
 from app.infrastructure.embedding_model import LocalSentenceTransformerModel
 from app.infrastructure.file_opener import DefaultFileOpener
@@ -30,6 +32,7 @@ from app.infrastructure.reranker_model import LocalBgeRerankerModel
 from app.infrastructure.scan_logger import JsonlScanLogger
 from app.infrastructure.scanner_gateway import CoreScannerGateway
 from app.infrastructure.tag_mining_logger import JsonlTagMiningLogger
+from app.infrastructure.tag_mining_thresholds import load_tag_mining_threshold_config
 from app.infrastructure.tokenizer_pkuseg import PkusegTokenizer
 
 
@@ -47,6 +50,28 @@ class TagCreateRequest(BaseModel):
 
 class TagIdListRequest(BaseModel):
     ids: list[int]
+
+
+class FeatureExtractionStartRequest(BaseModel):
+    strategy: str = "auto"
+    scope: str = "new_only"
+    embedding_model: str = ""
+    reranker_model: str = ""
+    min_df: int = 2
+    max_tags_per_video: int = 8
+    max_terms: int = 400
+    recall_top_k: Optional[int] = None
+    recall_min_score: Optional[float] = None
+    auto_apply: Optional[float] = None
+    pending_review: Optional[float] = None
+
+
+class FeatureModelPathRequest(BaseModel):
+    path: str = ""
+
+
+class FeatureModelOpenPathRequest(BaseModel):
+    path: str
 
 
 class ApiError(BaseModel):
@@ -79,12 +104,46 @@ class ScanState:
     rel_path: str = ""
 
 
+@dataclass
+class FeatureTaskState:
+    status: str = "idle"
+    phase: str = "idle"
+    message: str = "Idle"
+    progress_percent: int = 0
+    current: int = 0
+    total: int = 0
+    rel_path: str = ""
+    started_epoch: int = 0
+    updated_epoch: int = 0
+    strategy: str = "auto"
+    scope: str = "new_only"
+    embedding_model: str = ""
+    reranker_model: str = ""
+    min_df: int = 2
+    max_tags_per_video: int = 8
+    max_terms: int = 400
+    recall_top_k: Optional[int] = None
+    recall_min_score: Optional[float] = None
+    auto_apply: Optional[float] = None
+    pending_review: Optional[float] = None
+    result: Optional[dict[str, Any]] = None
+    fallback_reason: str = ""
+    dependency_status: str = "unknown"
+    dependency_message: str = ""
+
+
 class ApiRuntime:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.cancel = threading.Event()
         self.thread: Optional[threading.Thread] = None
         self.progress = ScanState()
+        self.feature_lock = threading.Lock()
+        self.feature_cancel = threading.Event()
+        self.feature_thread: Optional[threading.Thread] = None
+        self.feature_task = FeatureTaskState()
+        self.feature_model_root = (_project_root / "tools" / "models").resolve()
+        self.feature_imported_paths: set[str] = set()
 
 
 def build_service() -> LibraryService:
@@ -135,6 +194,19 @@ REQUIRED_TAG_ROUTES = (
 )
 
 LOG_SOURCES = ("scan", "tag_mining", "app_runtime")
+
+FEATURE_MODEL_TYPES = ("embedding", "reranker")
+
+EMBEDDING_PRESETS: dict[str, str] = {
+    "bge-small-zh-v1.5": "BAAI/bge-small-zh-v1.5",
+    "bge-base-zh-v1.5": "BAAI/bge-base-zh-v1.5",
+    "bge-large-zh-v1.5": "BAAI/bge-large-zh-v1.5",
+}
+
+RERANKER_PRESETS: dict[str, str] = {
+    "bge-reranker-base": "BAAI/bge-reranker-base",
+    "bge-reranker-large": "BAAI/bge-reranker-large",
+}
 
 
 def _auto_select_library() -> None:
@@ -288,7 +360,7 @@ def _validate_and_select_library(path: Path) -> JSONResponse | None:
     return None
 
 
-def _pick_directory() -> str:
+def _pick_directory(title: str = "Select Media Library") -> str:
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -299,7 +371,7 @@ def _pick_directory() -> str:
     try:
         root.withdraw()
         root.attributes("-topmost", True)
-        selected = filedialog.askdirectory(title="Select Media Library")
+        selected = filedialog.askdirectory(title=title)
     finally:
         root.destroy()
     return str(selected or "")
@@ -385,6 +457,248 @@ def _collect_runtime_info() -> dict[str, Any]:
     }
 
 
+def _looks_like_embedding_model_dir(path: Path) -> bool:
+    if not path.exists() or not path.is_dir():
+        return False
+    markers = ("config.json", "modules.json", "tokenizer_config.json")
+    return all((path / marker).exists() for marker in markers)
+
+
+def _looks_like_reranker_model_dir(path: Path) -> bool:
+    if not path.exists() or not path.is_dir():
+        return False
+    base_markers = ("config.json", "tokenizer_config.json")
+    if not all((path / marker).exists() for marker in base_markers):
+        return False
+    weight_markers = ("pytorch_model.bin", "model.safetensors")
+    return any((path / marker).exists() for marker in weight_markers)
+
+
+def _safe_model_name(raw: str) -> str:
+    normalized = re.sub(r"\s+", " ", str(raw or "").strip())
+    return normalized or "model"
+
+
+def _normalize_model_hint(raw: str) -> str:
+    hint = str(raw or "").strip()
+    if not hint:
+        return ""
+    as_path = Path(hint).expanduser()
+    if as_path.is_absolute():
+        return str(as_path.resolve()).lower()
+    candidate = (runtime.feature_model_root / hint).expanduser()
+    if candidate.exists() and candidate.is_dir():
+        return str(candidate.resolve()).lower()
+    return hint.lower()
+
+
+def _resolve_model_hint(raw: str) -> str:
+    hint = str(raw or "").strip()
+    if not hint:
+        return ""
+    as_path = Path(hint).expanduser()
+    if as_path.exists() and as_path.is_dir():
+        return str(as_path.resolve())
+    candidate = (runtime.feature_model_root / hint).expanduser()
+    if candidate.exists() and candidate.is_dir():
+        return str(candidate.resolve())
+    return hint
+
+
+def _build_feature_model_items() -> list[dict[str, Any]]:
+    root = runtime.feature_model_root
+    selected_embedding = _normalize_model_hint(runtime.feature_task.embedding_model)
+    selected_reranker = _normalize_model_hint(runtime.feature_task.reranker_model)
+    items: list[dict[str, Any]] = []
+
+    def append_item(
+        *,
+        model_type: str,
+        name: str,
+        source: str,
+        repo_id: str,
+        downloaded: bool,
+        local_path: Path | None,
+    ) -> None:
+        model_name = _safe_model_name(name)
+        resolved_path = str(local_path.resolve()) if (local_path and local_path.exists()) else ""
+        select_value = resolved_path or model_name
+        normalized_select = _normalize_model_hint(select_value)
+        selected_hint = selected_embedding if model_type == "embedding" else selected_reranker
+        items.append(
+            {
+                "id": f"{model_type}:{model_name}",
+                "type": model_type,
+                "name": model_name,
+                "source": source,
+                "downloaded": downloaded,
+                "download_status": "downloaded" if downloaded else "missing",
+                "local_path": resolved_path,
+                "download_url": f"https://huggingface.co/{repo_id}" if repo_id else "",
+                "repo_id": repo_id,
+                "select_value": select_value,
+                "selected": bool(selected_hint) and selected_hint == normalized_select,
+            }
+        )
+
+    for key, repo_id in EMBEDDING_PRESETS.items():
+        local_path = (root / key).resolve()
+        append_item(
+            model_type="embedding",
+            name=key,
+            source="preset",
+            repo_id=repo_id,
+            downloaded=_looks_like_embedding_model_dir(local_path),
+            local_path=local_path,
+        )
+
+    for key, repo_id in RERANKER_PRESETS.items():
+        local_path = (root / key).resolve()
+        append_item(
+            model_type="reranker",
+            name=key,
+            source="preset",
+            repo_id=repo_id,
+            downloaded=_looks_like_reranker_model_dir(local_path),
+            local_path=local_path,
+        )
+
+    preset_names = set(EMBEDDING_PRESETS.keys()) | set(RERANKER_PRESETS.keys())
+    custom_paths: set[Path] = set()
+    if root.exists() and root.is_dir():
+        for child in root.iterdir():
+            if not child.is_dir() or child.name in preset_names:
+                continue
+            custom_paths.add(child.resolve())
+    for raw_path in runtime.feature_imported_paths:
+        candidate = Path(raw_path).expanduser()
+        if candidate.exists() and candidate.is_dir():
+            custom_paths.add(candidate.resolve())
+
+    for custom_path in sorted(custom_paths, key=lambda p: str(p).lower()):
+        if _looks_like_embedding_model_dir(custom_path):
+            append_item(
+                model_type="embedding",
+                name=custom_path.name,
+                source="custom",
+                repo_id="",
+                downloaded=True,
+                local_path=custom_path,
+            )
+        if _looks_like_reranker_model_dir(custom_path):
+            append_item(
+                model_type="reranker",
+                name=custom_path.name,
+                source="custom",
+                repo_id="",
+                downloaded=True,
+                local_path=custom_path,
+            )
+
+    return items
+
+
+def _feature_threshold_payload() -> dict[str, Any]:
+    config = load_tag_mining_threshold_config(service.library_root())
+    return {
+        "source_path": config.source_path,
+        "warning": config.warning,
+        "recall_top_k": int(config.recall_top_k),
+        "recall_min_score": float(config.recall_min_score),
+        "auto_apply": float(config.defaults.auto_apply),
+        "pending_review": float(config.defaults.pending_review),
+    }
+
+
+def _read_latest_dependency_event() -> dict[str, Any] | None:
+    latest = service.latest_log("tag_mining")
+    if latest is None:
+        return None
+    rows = service.read_tag_mining_log(latest)
+    for row in reversed(rows):
+        if str(row.get("event") or "").strip().lower() != "dependency_loaded":
+            continue
+        return {
+            "status": str(row.get("status") or "").strip().lower(),
+            "reason": str(row.get("reason") or "").strip(),
+            "strategy_used": str(row.get("strategy_used") or "").strip(),
+            "ts_epoch": int(row.get("ts_epoch") or 0),
+            "log_id": latest.name,
+        }
+    return None
+
+
+def _feature_task_payload() -> dict[str, Any]:
+    with runtime.feature_lock:
+        task = runtime.feature_task
+        payload = {
+            "status": task.status,
+            "phase": task.phase,
+            "message": task.message,
+            "progress_percent": int(task.progress_percent),
+            "current": int(task.current),
+            "total": int(task.total),
+            "rel_path": task.rel_path,
+            "started_epoch": int(task.started_epoch),
+            "updated_epoch": int(task.updated_epoch),
+            "strategy": task.strategy,
+            "scope": task.scope,
+            "embedding_model": task.embedding_model,
+            "reranker_model": task.reranker_model,
+            "min_df": int(task.min_df),
+            "max_tags_per_video": int(task.max_tags_per_video),
+            "max_terms": int(task.max_terms),
+            "recall_top_k": task.recall_top_k,
+            "recall_min_score": task.recall_min_score,
+            "auto_apply": task.auto_apply,
+            "pending_review": task.pending_review,
+            "fallback_reason": task.fallback_reason,
+            "dependency_status": task.dependency_status,
+            "dependency_message": task.dependency_message,
+            "result": task.result or {},
+            "running_lock_model_switch": task.status in {"running", "stopping"},
+            "background_run_supported": True,
+        }
+
+    latest_dependency = _read_latest_dependency_event()
+    if latest_dependency is not None:
+        if not payload["dependency_status"] or payload["dependency_status"] == "unknown":
+            payload["dependency_status"] = latest_dependency.get("status") or "unknown"
+        if not payload["dependency_message"]:
+            payload["dependency_message"] = latest_dependency.get("reason") or ""
+        payload["dependency_log"] = latest_dependency
+
+    return payload
+
+
+def _task_progress_percent(progress: TagMiningProgress) -> int:
+    if progress.total > 0:
+        return int(max(0, min(100, (progress.current / progress.total) * 100)))
+    if progress.phase in {"tag_done"}:
+        return 100
+    return 0
+
+
+def _resolve_threshold_defaults(
+    payload: FeatureExtractionStartRequest,
+) -> dict[str, Optional[float | int]]:
+    defaults = _feature_threshold_payload()
+    return {
+        "recall_top_k": int(payload.recall_top_k) if payload.recall_top_k is not None else int(defaults["recall_top_k"]),
+        "recall_min_score": (
+            float(payload.recall_min_score)
+            if payload.recall_min_score is not None
+            else float(defaults["recall_min_score"])
+        ),
+        "auto_apply": float(payload.auto_apply) if payload.auto_apply is not None else float(defaults["auto_apply"]),
+        "pending_review": (
+            float(payload.pending_review)
+            if payload.pending_review is not None
+            else float(defaults["pending_review"])
+        ),
+    }
+
+
 @app.post("/api/library/select")
 def select_library(payload: LibrarySelectRequest) -> JSONResponse:
     path = Path(payload.path).expanduser()
@@ -429,7 +743,7 @@ def runtime_info() -> JSONResponse:
 @app.get("/api/directories")
 def list_directories(
     path: str = Query("", description="Relative path"),
-    depth: int = Query(2, ge=1, le=5),
+    depth: int = Query(8, ge=1, le=20),
 ) -> JSONResponse:
     if not service.has_library():
         return fail("NO_LIBRARY", "No library selected.")
@@ -755,6 +1069,297 @@ def analyze_log_events(
         return fail("LOG_NOT_FOUND", "Requested log file was not found.", status=404)
 
     return ok(data)
+
+
+def _build_feature_embedding_model(hint: str) -> Optional[EmbeddingModelPort]:
+    model_hint = _resolve_model_hint(hint)
+    if not model_hint:
+        return None
+    return LocalSentenceTransformerModel(model_hint=model_hint)
+
+
+def _build_feature_reranker_model(hint: str) -> Optional[RerankerModelPort]:
+    model_hint = _resolve_model_hint(hint)
+    if not model_hint:
+        return None
+    return LocalBgeRerankerModel(model_hint=model_hint)
+
+
+def _feature_extraction_worker() -> None:
+    with runtime.feature_lock:
+        task = runtime.feature_task
+        strategy = task.strategy
+        scope = task.scope
+        embedding_hint = task.embedding_model
+        reranker_hint = task.reranker_model
+        min_df = int(task.min_df)
+        max_tags_per_video = int(task.max_tags_per_video)
+        max_terms = int(task.max_terms)
+        recall_top_k = int(task.recall_top_k) if task.recall_top_k is not None else None
+        recall_min_score = (
+            float(task.recall_min_score) if task.recall_min_score is not None else None
+        )
+        auto_apply = float(task.auto_apply) if task.auto_apply is not None else None
+        pending_review = (
+            float(task.pending_review) if task.pending_review is not None else None
+        )
+
+    def _should_stop() -> bool:
+        return runtime.feature_cancel.is_set()
+
+    def _on_progress(progress: TagMiningProgress) -> None:
+        with runtime.feature_lock:
+            runtime.feature_task.phase = progress.phase
+            runtime.feature_task.message = progress.message
+            runtime.feature_task.current = int(progress.current)
+            runtime.feature_task.total = int(progress.total)
+            runtime.feature_task.rel_path = progress.rel_path
+            runtime.feature_task.progress_percent = _task_progress_percent(progress)
+            runtime.feature_task.updated_epoch = int(time.time())
+            if runtime.feature_task.status not in {"running", "stopping"}:
+                runtime.feature_task.status = "running"
+
+    embedding_model = _build_feature_embedding_model(embedding_hint)
+    reranker_model = _build_feature_reranker_model(reranker_hint)
+
+    try:
+        result = service.mine_title_tags(
+            progress=_on_progress,
+            min_df=min_df,
+            max_tags_per_video=max_tags_per_video,
+            max_terms=max_terms,
+            recall_top_k=recall_top_k,
+            recall_min_score=recall_min_score,
+            auto_apply=auto_apply,
+            pending_review=pending_review,
+            embedding_model=embedding_model,
+            reranker_model=reranker_model,
+            should_stop=_should_stop,
+            strategy=strategy,
+            scope=scope,
+        )
+        final_status = "cancelled" if result.status == "cancelled" else "completed"
+        dependency_status = "normal"
+        dependency_message = ""
+        if result.fallback_reason:
+            dependency_status = "degraded"
+            dependency_message = result.fallback_reason
+
+        with runtime.feature_lock:
+            runtime.feature_task.status = final_status
+            runtime.feature_task.phase = "tag_done" if final_status == "completed" else "tag_cancelled"
+            runtime.feature_task.message = (
+                "标签提取完成" if final_status == "completed" else "标签提取已取消"
+            )
+            runtime.feature_task.progress_percent = (
+                100 if final_status == "completed" else runtime.feature_task.progress_percent
+            )
+            runtime.feature_task.updated_epoch = int(time.time())
+            runtime.feature_task.fallback_reason = result.fallback_reason
+            runtime.feature_task.dependency_status = dependency_status
+            runtime.feature_task.dependency_message = dependency_message
+            runtime.feature_task.result = _feature_result_payload(result)
+    except Exception as exc:
+        with runtime.feature_lock:
+            runtime.feature_task.status = "failed"
+            runtime.feature_task.phase = "tag_error"
+            runtime.feature_task.message = f"标签提取失败: {exc}"
+            runtime.feature_task.updated_epoch = int(time.time())
+            runtime.feature_task.result = {
+                "status": "failed",
+                "error": str(exc),
+            }
+    finally:
+        runtime.feature_cancel.clear()
+
+
+def _feature_result_payload(result: TagMiningResult) -> dict[str, Any]:
+    return {
+        "status": result.status,
+        "processed_videos": int(result.processed_videos),
+        "selected_terms": int(result.selected_terms),
+        "tagged_videos": int(result.tagged_videos),
+        "created_relations": int(result.created_relations),
+        "pending_candidate_terms": int(result.pending_candidate_terms),
+        "pending_candidate_hits": int(result.pending_candidate_hits),
+        "semantic_auto_hits": int(result.semantic_auto_hits),
+        "semantic_pending_hits": int(result.semantic_pending_hits),
+        "semantic_rejected_hits": int(result.semantic_rejected_hits),
+        "elapsed_ms": int(result.elapsed_ms),
+        "strategy_requested": result.strategy_requested,
+        "strategy_used": result.strategy_used,
+        "model_name": result.model_name,
+        "reranker_name": result.reranker_name,
+        "fallback_reason": result.fallback_reason,
+        "scope": result.scope,
+        "threshold_config_path": result.threshold_config_path,
+        "top_terms": list(result.top_terms or []),
+    }
+
+
+def _feature_model_payload() -> dict[str, Any]:
+    items = _build_feature_model_items()
+    embedding_options = [
+        item for item in items if item["type"] == "embedding" and item["downloaded"]
+    ]
+    reranker_options = [
+        item for item in items if item["type"] == "reranker" and item["downloaded"]
+    ]
+    return {
+        "model_root": str(runtime.feature_model_root),
+        "items": items,
+        "embedding_options": embedding_options,
+        "reranker_options": reranker_options,
+    }
+
+
+@app.get("/api/feature-extraction/status")
+def feature_extraction_status() -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+    return ok(_feature_task_payload())
+
+
+@app.get("/api/feature-extraction/thresholds")
+def feature_extraction_thresholds() -> JSONResponse:
+    return ok(_feature_threshold_payload())
+
+
+@app.get("/api/feature-extraction/models")
+def feature_extraction_models() -> JSONResponse:
+    return ok(_feature_model_payload())
+
+
+@app.post("/api/feature-extraction/models/select-root")
+def feature_select_model_root(payload: FeatureModelPathRequest) -> JSONResponse:
+    path_raw = str(payload.path or "").strip()
+    selected = path_raw
+    if not selected:
+        try:
+            selected = _pick_directory(title="Select Feature Model Directory")
+        except Exception as exc:
+            return fail("PICKER_UNAVAILABLE", str(exc), status=500)
+        if not selected:
+            return fail("CANCELLED", "No folder selected.")
+
+    path = Path(selected).expanduser()
+    if not path.exists() or not path.is_dir():
+        return fail("INVALID_PATH", "Model root path does not exist or is not a directory.")
+
+    runtime.feature_model_root = path.resolve()
+    return ok(_feature_model_payload())
+
+
+@app.post("/api/feature-extraction/models/import-directory")
+def feature_import_model_directory(payload: FeatureModelPathRequest) -> JSONResponse:
+    path_raw = str(payload.path or "").strip()
+    selected = path_raw
+    if not selected:
+        try:
+            selected = _pick_directory(title="Import Model Directory")
+        except Exception as exc:
+            return fail("PICKER_UNAVAILABLE", str(exc), status=500)
+        if not selected:
+            return fail("CANCELLED", "No folder selected.")
+
+    path = Path(selected).expanduser()
+    if not path.exists() or not path.is_dir():
+        return fail("INVALID_PATH", "Import path does not exist or is not a directory.")
+    if not _looks_like_embedding_model_dir(path) and not _looks_like_reranker_model_dir(path):
+        return fail("INVALID_MODEL_DIR", "Directory does not look like a supported local model.")
+
+    runtime.feature_imported_paths.add(str(path.resolve()))
+    return ok(
+        {
+            "imported_path": str(path.resolve()),
+            **_feature_model_payload(),
+        }
+    )
+
+
+@app.post("/api/feature-extraction/models/open-path")
+def feature_open_model_path(payload: FeatureModelOpenPathRequest) -> JSONResponse:
+    path = Path(str(payload.path or "")).expanduser()
+    if not path.exists():
+        return fail("NOT_FOUND", "Path not found.", status=404)
+    try:
+        DefaultFileOpener().open_file(path)
+    except Exception as exc:
+        return fail("OPEN_FAILED", str(exc), status=500)
+    return ok({"status": "opened", "path": str(path.resolve())})
+
+
+@app.post("/api/feature-extraction/start")
+def start_feature_extraction(payload: FeatureExtractionStartRequest) -> JSONResponse:
+    maybe_error = _ensure_library_selected()
+    if maybe_error is not None:
+        return maybe_error
+
+    with runtime.feature_lock:
+        if runtime.feature_thread and runtime.feature_thread.is_alive():
+            return fail("TASK_RUNNING", "Feature extraction task is already running.", status=409)
+
+        strategy = str(payload.strategy or "auto").strip().lower() or "auto"
+        scope = str(payload.scope or "new_only").strip().lower() or "new_only"
+        if strategy not in {"auto", "rule", "model"}:
+            return fail("INVALID_PAYLOAD", "strategy must be one of auto/rule/model.")
+        if scope not in {"all", "new_only"}:
+            return fail("INVALID_PAYLOAD", "scope must be one of all/new_only.")
+
+        resolved_thresholds = _resolve_threshold_defaults(payload)
+        runtime.feature_task = FeatureTaskState(
+            status="running",
+            phase="model_loading",
+            message="正在检查模型与依赖...",
+            progress_percent=0,
+            current=0,
+            total=0,
+            rel_path="",
+            started_epoch=int(time.time()),
+            updated_epoch=int(time.time()),
+            strategy=strategy,
+            scope=scope,
+            embedding_model=_resolve_model_hint(payload.embedding_model),
+            reranker_model=_resolve_model_hint(payload.reranker_model),
+            min_df=max(1, int(payload.min_df)),
+            max_tags_per_video=max(1, int(payload.max_tags_per_video)),
+            max_terms=max(1, int(payload.max_terms)),
+            recall_top_k=int(resolved_thresholds["recall_top_k"]) if resolved_thresholds["recall_top_k"] is not None else None,
+            recall_min_score=(
+                float(resolved_thresholds["recall_min_score"])
+                if resolved_thresholds["recall_min_score"] is not None
+                else None
+            ),
+            auto_apply=float(resolved_thresholds["auto_apply"]) if resolved_thresholds["auto_apply"] is not None else None,
+            pending_review=(
+                float(resolved_thresholds["pending_review"])
+                if resolved_thresholds["pending_review"] is not None
+                else None
+            ),
+            result={},
+            fallback_reason="",
+            dependency_status="unknown",
+            dependency_message="",
+        )
+
+    runtime.feature_cancel.clear()
+    thread = threading.Thread(target=_feature_extraction_worker, daemon=True)
+    runtime.feature_thread = thread
+    thread.start()
+    return ok({"status": "started", "task": _feature_task_payload()})
+
+
+@app.post("/api/feature-extraction/stop")
+def stop_feature_extraction() -> JSONResponse:
+    with runtime.feature_lock:
+        if not runtime.feature_thread or not runtime.feature_thread.is_alive():
+            return fail("TASK_NOT_RUNNING", "Feature extraction task is not running.", status=409)
+        runtime.feature_task.status = "stopping"
+        runtime.feature_task.message = "正在请求停止..."
+        runtime.feature_task.updated_epoch = int(time.time())
+    runtime.feature_cancel.set()
+    return ok({"status": "stop_requested"})
 
 
 @app.get("/api/scan/progress")

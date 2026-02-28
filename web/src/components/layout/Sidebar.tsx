@@ -142,7 +142,7 @@ export function Sidebar({
 
       <div className="h-px w-full bg-[var(--color-sidebar-divider)]" />
 
-      <div className="flex flex-1 flex-col gap-[10px] bg-[var(--color-sidebar-body)] px-3 pb-3 pt-[14px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[12px] bg-[var(--color-sidebar-body)] px-3 pb-3 pt-[14px]">
         <div className="flex h-8 items-center justify-between">
           <span className="font-sidebar text-[13px] font-bold text-[var(--color-sidebar-brand)]">{libraryTitle}</span>
           <button
@@ -160,11 +160,11 @@ export function Sidebar({
 
         <div className="h-px w-full bg-[var(--color-sidebar-divider)]" />
 
-        <div className="flex flex-1 flex-col gap-1 overflow-y-auto pr-1">
+        <div className="sidebar-tree-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-1">
           {renderTreeNode(rootNode, 0, selectedDirectoryId, onSelectDirectory, canInteract)}
         </div>
 
-        <div className="flex flex-col gap-[10px]">
+        <div className="mt-6 flex flex-col gap-[10px]">
           <div className="h-px w-full bg-[var(--color-border)]" />
 
           <div className="flex h-[86px] items-center justify-between px-4">

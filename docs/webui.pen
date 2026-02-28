@@ -15356,7 +15356,7 @@
                       "type": "frame",
                       "id": "ZBdqu",
                       "name": "Log Events Pane",
-                      "context": "{\"type\":\"right_panel_contract\",\"filters\":[\"q\",\"level\",\"event\",\"from_ts\",\"to_ts\"],\"filter_to_query\":{\"q\":\"q\",\"level\":\"level\",\"event\":\"event\",\"from_ts\":\"from_ts\",\"to_ts\":\"to_ts\"},\"table_columns\":[\"time\",\"level\",\"event\",\"path\",\"summary\"],\"detail\":\"right_slideout_json_drawer\",\"detail_open_trigger\":\"dblclick_row\",\"single_click\":\"select_only\",\"default_closed\":true,\"detail_close_entry\":\"header_button_only\",\"pagination\":\"full_control\",\"delivery_note\":\"详情关闭入口放在抽屉头部按钮，不使用底栏\"}",
+                      "context": "{\"type\":\"right_panel_contract\",\"filters\":[\"q\",\"level\",\"event\",\"from_ts\",\"to_ts\"],\"filter_to_query\":{\"q\":\"q\",\"level\":\"level\",\"event\":\"event\",\"from_ts\":\"from_ts\",\"to_ts\":\"to_ts\"},\"table_columns\":[\"time\",\"level\",\"event\",\"path\",\"summary\"],\"detail\":\"right_slideout_json_drawer\",\"detail_open_trigger\":\"dblclick_row\",\"single_click\":\"select_only\",\"default_closed\":true,\"detail_close_entry\":\"header_button_only\",\"pagination\":\"full_control\",\"pagination_dock\":\"outside_events_table_card_bottom\",\"delivery_note\":\"分页栏独立于灰色日志记录卡\"}",
                       "width": "fill_container",
                       "height": "fill_container",
                       "fill": "#FFFFFF",
@@ -15541,7 +15541,7 @@
                           "type": "frame",
                           "id": "zOTIv",
                           "name": "Events Table Card",
-                          "context": "{\"type\":\"events_table_contract\",\"api\":\"GET /api/logs/events\",\"query\":[\"source\",\"log_id\",\"page\",\"page_size\",\"level\",\"event\",\"q\",\"from_ts\",\"to_ts\"],\"response_fields\":[\"items\",\"total\",\"page\",\"page_size\"],\"row_fields\":[\"ts_epoch\",\"level\",\"event\",\"rel_path\",\"summary\",\"payload\"],\"columns\":[\"time\",\"level\",\"event\",\"path\",\"summary\"],\"row_click\":\"select_only\",\"row_double_click\":\"open_detail_drawer\",\"detail_panel\":\"right_slideout\",\"pagination\":true,\"pagination_style\":\"full_control\",\"parse_error_row\":\"highlight_error\",\"empty_state\":\"暂无事件\",\"error_state\":\"事件加载失败\",\"scroll_behavior\":\"wheel_inside_scrolls_table\"}",
+                          "context": "{\"type\":\"events_table_contract\",\"api\":\"GET /api/logs/events\",\"query\":[\"source\",\"log_id\",\"page\",\"page_size\",\"level\",\"event\",\"q\",\"from_ts\",\"to_ts\"],\"response_fields\":[\"items\",\"total\",\"page\",\"page_size\"],\"row_fields\":[\"ts_epoch\",\"level\",\"event\",\"rel_path\",\"summary\",\"payload\"],\"columns\":[\"time\",\"level\",\"event\",\"path\",\"summary\"],\"row_click\":\"select_only\",\"row_double_click\":\"open_detail_drawer\",\"detail_panel\":\"right_slideout\",\"pagination\":true,\"pagination_style\":\"full_control\",\"pagination_host\":\"outside_events_table_card\",\"parse_error_row\":\"highlight_error\",\"empty_state\":\"暂无事件\",\"error_state\":\"事件加载失败\",\"scroll_behavior\":\"wheel_inside_scrolls_table\"}",
                           "width": "fill_container",
                           "height": "fill_container",
                           "fill": "#F8FAFC",
@@ -15837,248 +15837,259 @@
                                   "fontWeight": "700"
                                 }
                               ]
-                            },
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ISA7B",
+                          "name": "Events Pagination Main Only",
+                          "width": "fill_container",
+                          "height": 56,
+                          "fill": "#FFFFFF",
+                          "cornerRadius": 10,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#E5E7EB"
+                          },
+                          "padding": [
+                            8,
+                            10
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
                             {
                               "type": "frame",
-                              "id": "ISA7B",
-                              "name": "Events Pagination Full",
-                              "width": "fill_container",
-                              "height": 52,
+                              "id": "ch9Dy",
+                              "name": "Pagination Control",
+                              "gap": 8,
                               "justifyContent": "center",
                               "alignItems": "center",
                               "children": [
                                 {
                                   "type": "frame",
-                                  "id": "ch9Dy",
-                                  "name": "Pagination Control",
-                                  "gap": 8,
+                                  "id": "6Idef",
+                                  "name": "Page Prev",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
                                   "justifyContent": "center",
                                   "alignItems": "center",
                                   "children": [
                                     {
-                                      "type": "frame",
-                                      "id": "6Idef",
-                                      "name": "Page Prev",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "QV3Wu",
-                                          "name": "p5prevt",
-                                          "fill": "#4B5563",
-                                          "content": "<",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
+                                      "type": "text",
+                                      "id": "QV3Wu",
+                                      "name": "p5prevt",
+                                      "fill": "#4B5563",
+                                      "content": "<",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "PcfYa",
+                                  "name": "Page Next",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
                                     {
-                                      "type": "frame",
-                                      "id": "PcfYa",
-                                      "name": "Page Next",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "AlwAh",
-                                          "name": "p5nextt",
-                                          "fill": "#4B5563",
-                                          "content": ">",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
+                                      "type": "text",
+                                      "id": "AlwAh",
+                                      "name": "p5nextt",
+                                      "fill": "#4B5563",
+                                      "content": ">",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "7sMkK",
+                                  "name": "Page 1",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#111827",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
                                     {
-                                      "type": "frame",
-                                      "id": "7sMkK",
-                                      "name": "Page 1",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#111827",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "o7ywv",
-                                          "name": "p5p1t",
-                                          "fill": "#FFFFFF",
-                                          "content": "1",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "y5G3k",
-                                      "name": "Page 2",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "ktxzs",
-                                          "name": "p5p2t",
-                                          "fill": "#4B5563",
-                                          "content": "2",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "OtASI",
-                                      "name": "Page 3",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "rv4vM",
-                                          "name": "p5p3t",
-                                          "fill": "#4B5563",
-                                          "content": "3",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "oRCwP",
-                                      "name": "Page 4",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "wg4Yb",
-                                          "name": "p5p4t",
-                                          "fill": "#4B5563",
-                                          "content": "4",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "9mxNr",
-                                      "name": "Page Dots",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "jIUR9",
-                                          "name": "p5dotst",
-                                          "fill": "#4B5563",
-                                          "content": "...",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "1H3we",
-                                      "name": "Page 5",
-                                      "width": 32,
-                                      "height": 32,
-                                      "fill": "#F3F4F6",
-                                      "cornerRadius": 8,
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "4wBBJ",
-                                          "name": "p5p5t",
-                                          "fill": "#4B5563",
-                                          "content": "5",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 13,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "CJYTY",
-                                      "name": "Page Input",
-                                      "width": 44,
-                                      "height": 32,
+                                      "type": "text",
+                                      "id": "o7ywv",
+                                      "name": "p5p1t",
                                       "fill": "#FFFFFF",
-                                      "cornerRadius": 8,
-                                      "stroke": {
-                                        "thickness": 1,
-                                        "fill": "#E5E7EB"
-                                      },
-                                      "justifyContent": "center",
-                                      "alignItems": "center"
-                                    },
+                                      "content": "1",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "y5G3k",
+                                  "name": "Page 2",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
                                     {
-                                      "type": "frame",
-                                      "id": "nkmfF",
-                                      "name": "Page Go",
-                                      "height": 32,
-                                      "fill": "#111827",
-                                      "cornerRadius": 8,
-                                      "padding": [
-                                        0,
-                                        12
-                                      ],
-                                      "justifyContent": "center",
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "text",
-                                          "id": "fKmm5",
-                                          "name": "p5got",
-                                          "fill": "#FFFFFF",
-                                          "content": "GO",
-                                          "fontFamily": "Fira Sans",
-                                          "fontSize": 12,
-                                          "fontWeight": "700"
-                                        }
-                                      ]
+                                      "type": "text",
+                                      "id": "ktxzs",
+                                      "name": "p5p2t",
+                                      "fill": "#4B5563",
+                                      "content": "2",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "OtASI",
+                                  "name": "Page 3",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "rv4vM",
+                                      "name": "p5p3t",
+                                      "fill": "#4B5563",
+                                      "content": "3",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "oRCwP",
+                                  "name": "Page 4",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "wg4Yb",
+                                      "name": "p5p4t",
+                                      "fill": "#4B5563",
+                                      "content": "4",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "9mxNr",
+                                  "name": "Page Dots",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "jIUR9",
+                                      "name": "p5dotst",
+                                      "fill": "#4B5563",
+                                      "content": "...",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "1H3we",
+                                  "name": "Page 5",
+                                  "width": 32,
+                                  "height": 32,
+                                  "fill": "#F3F4F6",
+                                  "cornerRadius": 8,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "4wBBJ",
+                                      "name": "p5p5t",
+                                      "fill": "#4B5563",
+                                      "content": "5",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "CJYTY",
+                                  "name": "Page Input",
+                                  "width": 44,
+                                  "height": 32,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "thickness": 1,
+                                    "fill": "#E5E7EB"
+                                  },
+                                  "justifyContent": "center",
+                                  "alignItems": "center"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "nkmfF",
+                                  "name": "Page Go",
+                                  "height": 32,
+                                  "fill": "#111827",
+                                  "cornerRadius": 8,
+                                  "padding": [
+                                    0,
+                                    12
+                                  ],
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "fKmm5",
+                                      "name": "p5got",
+                                      "fill": "#FFFFFF",
+                                      "content": "GO",
+                                      "fontFamily": "Fira Sans",
+                                      "fontSize": 12,
+                                      "fontWeight": "700"
                                     }
                                   ]
                                 }

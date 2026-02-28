@@ -178,3 +178,97 @@ export type ApiLogAnalysisData = {
   last_error_ts: number | null;
   top_events: Array<{ event: string; count: number }>;
 };
+
+export type ApiFeatureModelType = "embedding" | "reranker";
+
+export type ApiFeatureModelItem = {
+  id: string;
+  type: ApiFeatureModelType;
+  name: string;
+  source: "preset" | "custom";
+  downloaded: boolean;
+  download_status: "downloaded" | "missing";
+  local_path: string;
+  download_url: string;
+  repo_id: string;
+  select_value: string;
+  selected: boolean;
+};
+
+export type ApiFeatureModelsData = {
+  model_root: string;
+  items: ApiFeatureModelItem[];
+  embedding_options: ApiFeatureModelItem[];
+  reranker_options: ApiFeatureModelItem[];
+  imported_path?: string;
+};
+
+export type ApiFeatureThresholdsData = {
+  source_path: string;
+  warning: string;
+  recall_top_k: number;
+  recall_min_score: number;
+  auto_apply: number;
+  pending_review: number;
+};
+
+export type ApiFeatureTaskResultData = {
+  status: string;
+  processed_videos: number;
+  selected_terms: number;
+  tagged_videos: number;
+  created_relations: number;
+  pending_candidate_terms: number;
+  pending_candidate_hits: number;
+  semantic_auto_hits: number;
+  semantic_pending_hits: number;
+  semantic_rejected_hits: number;
+  elapsed_ms: number;
+  strategy_requested: string;
+  strategy_used: string;
+  model_name: string;
+  reranker_name: string;
+  fallback_reason: string;
+  scope: string;
+  threshold_config_path: string;
+  top_terms: string[];
+  error?: string;
+};
+
+export type ApiFeatureDependencyLogData = {
+  status: string;
+  reason: string;
+  strategy_used: string;
+  ts_epoch: number;
+  log_id: string;
+};
+
+export type ApiFeatureTaskData = {
+  status: string;
+  phase: string;
+  message: string;
+  progress_percent: number;
+  current: number;
+  total: number;
+  rel_path: string;
+  started_epoch: number;
+  updated_epoch: number;
+  strategy: string;
+  scope: string;
+  embedding_model: string;
+  reranker_model: string;
+  min_df: number;
+  max_tags_per_video: number;
+  max_terms: number;
+  recall_top_k: number | null;
+  recall_min_score: number | null;
+  auto_apply: number | null;
+  pending_review: number | null;
+  fallback_reason: string;
+  dependency_status: string;
+  dependency_message: string;
+  result: ApiFeatureTaskResultData;
+  running_lock_model_switch: boolean;
+  background_run_supported: boolean;
+  dependency_log?: ApiFeatureDependencyLogData;
+};

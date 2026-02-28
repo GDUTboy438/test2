@@ -13,6 +13,8 @@ type UnifiedSearchResultsProps = {
   selectedTagIds: number[];
   selectedCandidateIds: number[];
   selectedBlacklistIds: number[];
+  highlightedTagIds: number[];
+  highlightedCandidateIds: number[];
   onToggleTag: (id: number) => void;
   onToggleCandidate: (id: number) => void;
   onToggleBlacklist: (id: number) => void;
@@ -84,6 +86,19 @@ function EmptyResult() {
   );
 }
 
+function candidateStatusLabel(status: TagCandidateItem["status"]): string {
+  if (status === "approved") {
+    return "已通过";
+  }
+  if (status === "blacklisted") {
+    return "已拉黑";
+  }
+  if (status === "mapped") {
+    return "已映射";
+  }
+  return "待审";
+}
+
 export function UnifiedSearchResults({
   tagLibrary,
   candidates,
@@ -91,6 +106,8 @@ export function UnifiedSearchResults({
   selectedTagIds,
   selectedCandidateIds,
   selectedBlacklistIds,
+  highlightedTagIds,
+  highlightedCandidateIds,
   onToggleTag,
   onToggleCandidate,
   onToggleBlacklist,
@@ -101,6 +118,12 @@ export function UnifiedSearchResults({
   const tagLayout = useAutoRowCapacity();
   const candidateLayout = useAutoRowCapacity();
   const blacklistLayout = useAutoRowCapacity();
+
+  const highlightedTagSet = useMemo(() => new Set(highlightedTagIds), [highlightedTagIds]);
+  const highlightedCandidateSet = useMemo(
+    () => new Set(highlightedCandidateIds),
+    [highlightedCandidateIds],
+  );
 
   const tagRows = useMemo(
     () => chunkRows(tagLibrary, tagLayout.perRow),
@@ -134,6 +157,7 @@ export function UnifiedSearchResults({
                     onDelete={() => {
                       void onDeleteOneTag(item.id);
                     }}
+                    highlighted={highlightedTagSet.has(item.id)}
                   />
                 ))}
               </div>
@@ -155,6 +179,8 @@ export function UnifiedSearchResults({
                     checked={selectedCandidateIds.includes(item.id)}
                     onToggle={() => onToggleCandidate(item.id)}
                     tone={item.status === "blacklisted" ? "blacklist" : "candidate"}
+                    statusLabel={candidateStatusLabel(item.status)}
+                    highlighted={highlightedCandidateSet.has(item.id)}
                   />
                 ))}
               </div>

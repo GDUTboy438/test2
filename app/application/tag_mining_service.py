@@ -5,6 +5,7 @@ import re
 import time
 import unicodedata
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Optional
 
@@ -19,6 +20,7 @@ from app.application.ports import (
     TokenizerPort,
 )
 from app.infrastructure.tag_mining_thresholds import (
+    TagScoreThreshold,
     TagMiningThresholdConfig,
     load_tag_mining_threshold_config,
 )
@@ -70,6 +72,10 @@ class TitleTagMiningService:
         min_df: int = 2,
         max_tags_per_video: int = 8,
         max_terms: int = 400,
+        recall_top_k: Optional[int] = None,
+        recall_min_score: Optional[float] = None,
+        auto_apply: Optional[float] = None,
+        pending_review: Optional[float] = None,
         should_stop: Optional[Callable[[], bool]] = None,
         strategy: str = "auto",
         scope: str = "all",
@@ -84,6 +90,13 @@ class TitleTagMiningService:
         max_terms = max(1, int(max_terms))
         scope_normalized = self._normalize_scope(scope)
         threshold_config = load_tag_mining_threshold_config(root)
+        threshold_config = self._apply_threshold_overrides(
+            threshold_config=threshold_config,
+            recall_top_k=recall_top_k,
+            recall_min_score=recall_min_score,
+            auto_apply=auto_apply,
+            pending_review=pending_review,
+        )
 
         tokenizer_name = ""
         tokenizer_available = False
@@ -156,6 +169,15 @@ class TitleTagMiningService:
         else:
             strategy_used = "rule"
 
+        dependency_state = "ready"
+        dependency_reason = ""
+        if not tokenizer_available:
+            dependency_state = "degraded"
+            dependency_reason = tokenizer_reason or "分词器不可用"
+        elif strategy_requested in {"auto", "model"} and strategy_used != "model":
+            dependency_state = "degraded"
+            dependency_reason = fallback_reason or "模型不可用，回退规则模式"
+
         videos = self._collect_videos(scope_normalized)
         total = len(videos)
         cleared_pending_candidates = self._repo.clear_pending_tag_candidates()
@@ -203,6 +225,19 @@ class TitleTagMiningService:
                 "tokenizer_name": tokenizer_name,
                 "tokenizer_available": tokenizer_available,
                 "tokenizer_reason": tokenizer_reason,
+            },
+        )
+        self._logger.log_event(
+            "dependency_loaded",
+            {
+                "status": dependency_state,
+                "reason": dependency_reason,
+                "strategy_requested": strategy_requested,
+                "strategy_used": strategy_used,
+                "tokenizer_name": tokenizer_name,
+                "tokenizer_available": tokenizer_available,
+                "embedding_model": model_name,
+                "reranker_model": reranker_name,
             },
         )
         if threshold_config.warning:
@@ -1340,6 +1375,41 @@ class TitleTagMiningService:
             return bool(should_stop())
         except Exception:
             return False
+
+    def _apply_threshold_overrides(
+        self,
+        *,
+        threshold_config: TagMiningThresholdConfig,
+        recall_top_k: Optional[int],
+        recall_min_score: Optional[float],
+        auto_apply: Optional[float],
+        pending_review: Optional[float],
+    ) -> TagMiningThresholdConfig:
+        next_config = threshold_config
+        if recall_top_k is not None:
+            next_config = replace(next_config, recall_top_k=max(1, int(recall_top_k)))
+        if recall_min_score is not None:
+            score = float(recall_min_score)
+            if score < 0.0:
+                score = 0.0
+            if score > 1.0:
+                score = 1.0
+            next_config = replace(next_config, recall_min_score=score)
+        if auto_apply is not None or pending_review is not None:
+            next_defaults = TagScoreThreshold(
+                auto_apply=(
+                    float(auto_apply)
+                    if auto_apply is not None
+                    else float(next_config.defaults.auto_apply)
+                ),
+                pending_review=(
+                    float(pending_review)
+                    if pending_review is not None
+                    else float(next_config.defaults.pending_review)
+                ),
+            ).normalized()
+            next_config = replace(next_config, defaults=next_defaults)
+        return next_config
 
     def _emit_progress(
         self,

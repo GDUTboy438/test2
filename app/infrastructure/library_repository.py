@@ -721,16 +721,16 @@ class SqliteLibraryRepository:
         with conn:
             rows = conn.execute(
                 f"""
-                SELECT id, name
+                SELECT id, name, status
                 FROM tag_candidates
                 WHERE id IN ({placeholders})
-                  AND status = 'pending'
                 """,
                 tuple(unique_ids),
             ).fetchall()
             for row in rows:
                 candidate_id = int(row["id"])
                 candidate_name = str(row["name"] or "").strip()
+                status = str(row["status"] or "pending").strip().lower()
                 if candidate_name and self._upsert_blacklist_term_row(
                     conn=conn,
                     term=candidate_name,
@@ -739,20 +739,21 @@ class SqliteLibraryRepository:
                     now=now,
                 ):
                     terms_added += 1
-                conn.execute(
-                    """
-                    UPDATE tag_candidates
-                    SET status = 'blacklisted', mapped_tag_id = NULL, last_seen_epoch = ?
-                    WHERE id = ?
-                    """,
-                    (now, candidate_id),
-                )
-                blacklisted += 1
+                if status != "blacklisted":
+                    conn.execute(
+                        """
+                        UPDATE tag_candidates
+                        SET status = 'blacklisted', mapped_tag_id = NULL, last_seen_epoch = ?
+                        WHERE id = ?
+                        """,
+                        (now, candidate_id),
+                    )
+                    blacklisted += 1
 
-            if blacklisted > 0:
+            if blacklisted > 0 or terms_added > 0:
                 self._set_meta(conn, "updated_at", str(now))
 
-        if blacklisted > 0:
+        if blacklisted > 0 or terms_added > 0:
             self._load_data()
         return {
             "blacklisted_candidates": blacklisted,
@@ -781,19 +782,23 @@ class SqliteLibraryRepository:
         now = _now_epoch()
         approved = 0
         applied_relations = 0
+        blacklist_terms_removed = 0
         with conn:
             rows = conn.execute(
                 f"""
-                SELECT id, name
+                SELECT id, name, status, mapped_tag_id
                 FROM tag_candidates
                 WHERE id IN ({placeholders})
-                  AND status = 'pending'
                 """,
                 tuple(unique_ids),
             ).fetchall()
             for row in rows:
                 candidate_id = int(row["id"])
-                tag_name = str(row["name"])
+                tag_name = str(row["name"] or "").strip()
+                status = str(row["status"] or "pending").strip().lower()
+                mapped_tag_id = int(row["mapped_tag_id"] or 0)
+                if not tag_name:
+                    continue
                 conn.execute(
                     "INSERT INTO tags(name) VALUES (?) ON CONFLICT(name) DO NOTHING",
                     (tag_name,),
@@ -827,20 +832,27 @@ class SqliteLibraryRepository:
                     )
                     applied_relations += 1
 
-                conn.execute(
-                    """
-                    UPDATE tag_candidates
-                    SET status = 'approved', mapped_tag_id = ?, last_seen_epoch = ?
-                    WHERE id = ?
-                    """,
-                    (tag_id, now, candidate_id),
-                )
-                approved += 1
+                if status != "approved" or mapped_tag_id != tag_id:
+                    conn.execute(
+                        """
+                        UPDATE tag_candidates
+                        SET status = 'approved', mapped_tag_id = ?, last_seen_epoch = ?
+                        WHERE id = ?
+                        """,
+                        (tag_id, now, candidate_id),
+                    )
+                    approved += 1
 
-            if approved > 0:
+                removed = conn.execute(
+                    "DELETE FROM tag_blacklist WHERE lower(term) = lower(?)",
+                    (tag_name,),
+                )
+                blacklist_terms_removed += int(removed.rowcount or 0)
+
+            if approved > 0 or applied_relations > 0 or blacklist_terms_removed > 0:
                 self._set_meta(conn, "updated_at", str(now))
 
-        if approved > 0:
+        if approved > 0 or applied_relations > 0 or blacklist_terms_removed > 0:
             self._load_data()
         return {"approved_candidates": approved, "applied_relations": applied_relations}
 
@@ -951,19 +963,42 @@ class SqliteLibraryRepository:
 
         placeholders = ", ".join(["?"] * len(unique_ids))
         now = _now_epoch()
+        affected = 0
+        removed_blacklist_terms = 0
         with conn:
-            cur = conn.execute(
+            rows = conn.execute(
                 f"""
-                UPDATE tag_candidates
-                SET status = 'pending', last_seen_epoch = ?
+                SELECT id, name, status
+                FROM tag_candidates
                 WHERE id IN ({placeholders})
-                  AND status = 'blacklisted'
                 """,
-                (now, *tuple(unique_ids)),
-            )
-            affected = int(cur.rowcount or 0)
-            if affected > 0:
+                tuple(unique_ids),
+            ).fetchall()
+            for row in rows:
+                candidate_id = int(row["id"])
+                status = str(row["status"] or "pending").strip().lower()
+                candidate_name = str(row["name"] or "").strip()
+                if status != "pending":
+                    conn.execute(
+                        """
+                        UPDATE tag_candidates
+                        SET status = 'pending', mapped_tag_id = NULL, last_seen_epoch = ?
+                        WHERE id = ?
+                        """,
+                        (now, candidate_id),
+                    )
+                    affected += 1
+                if candidate_name:
+                    removed = conn.execute(
+                        "DELETE FROM tag_blacklist WHERE lower(term) = lower(?)",
+                        (candidate_name,),
+                    )
+                    removed_blacklist_terms += int(removed.rowcount or 0)
+
+            if affected > 0 or removed_blacklist_terms > 0:
                 self._set_meta(conn, "updated_at", str(now))
+        if affected > 0 or removed_blacklist_terms > 0:
+            self._load_data()
         return affected
 
     def list_tags(self) -> list[Dict[str, Any]]:

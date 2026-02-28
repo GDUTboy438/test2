@@ -1,5 +1,10 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getTagManagerFixture } from "../design/tag-manager-fixtures";
+import {
+  clearTagManagerLinkageFromUrl,
+  normalizeMatchKey,
+  readTagManagerLinkageFromUrl,
+} from "../navigation/tag-manager-linkage";
 import {
   approveTagCandidates,
   blacklistTagCandidates,
@@ -25,12 +30,13 @@ import type {
 } from "../types/domain";
 
 function readMode(): UiMode {
-  const mode = new URLSearchParams(window.location.search).get("mode");
-  return mode === "visual" ? "visual" : "live";
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+  return mode === "visual" && params.has("scene") ? "visual" : "live";
 }
 
 function normalize(text: string): string {
-  return String(text || "").trim().toLowerCase();
+  return normalizeMatchKey(text);
 }
 
 function parseNames(raw: string): string[] {
@@ -85,6 +91,8 @@ export type TagManagerState = {
   visibleTagLibrary: TagLibraryItem[];
   visibleCandidates: TagCandidateItem[];
   visibleBlacklist: TagBlacklistItem[];
+  highlightedTagIds: number[];
+  highlightedCandidateIds: number[];
   selectedTagIds: number[];
   selectedCandidateIds: number[];
   selectedBlacklistIds: number[];
@@ -109,13 +117,19 @@ export type TagManagerState = {
 export function useTagManagerState(): TagManagerState {
   const mode = readMode();
   const fixture = useMemo(() => getTagManagerFixture(), []);
+  const linkage = useMemo(
+    () => (mode === "live" ? readTagManagerLinkageFromUrl() : null),
+    [mode],
+  );
 
   const [loading, setLoading] = useState(mode === "live");
   const [errorMessage, setErrorMessage] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [searchInput, setSearchInput] = useState(fixture.searchInput);
   const [source, setSource] = useState<TagSource>(fixture.source);
-  const [activeSection, setActiveSectionState] = useState<TagSection | null>(fixture.activeSection);
+  const [activeSection, setActiveSectionState] = useState<TagSection | null>(
+    linkage?.focus ?? fixture.activeSection,
+  );
 
   const [tagLibrary, setTagLibrary] = useState<TagLibraryItem[]>(
     mode === "visual" ? fixture.tagLibrary : [],
@@ -130,6 +144,11 @@ export function useTagManagerState(): TagManagerState {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [selectedBlacklistIds, setSelectedBlacklistIds] = useState<number[]>([]);
+  const [highlightTagKeys, setHighlightTagKeys] = useState<string[]>(linkage?.highlightTags ?? []);
+  const [highlightCandidateKeys, setHighlightCandidateKeys] = useState<string[]>(
+    linkage?.highlightCandidates ?? [],
+  );
+  const [highlightExpireAt, setHighlightExpireAt] = useState<number>(linkage?.expireAt ?? 0);
 
   const setActiveSection = useCallback((value: TagSection) => {
     setActiveSectionState((prev) => (prev === value ? null : value));
@@ -147,6 +166,27 @@ export function useTagManagerState(): TagManagerState {
     const timer = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (mode !== "live" || highlightExpireAt <= 0) {
+      return;
+    }
+    const remaining = highlightExpireAt - Date.now();
+    if (remaining <= 0) {
+      setHighlightTagKeys([]);
+      setHighlightCandidateKeys([]);
+      setHighlightExpireAt(0);
+      clearTagManagerLinkageFromUrl(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setHighlightTagKeys([]);
+      setHighlightCandidateKeys([]);
+      setHighlightExpireAt(0);
+      clearTagManagerLinkageFromUrl(true);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [highlightExpireAt, mode]);
 
   const refreshAll = useCallback(async () => {
     if (mode !== "live") {
@@ -172,7 +212,7 @@ export function useTagManagerState(): TagManagerState {
 
     const [libraryResp, candidatesResp, blacklistResp] = await Promise.all([
       getTagLibrary(),
-      getTagCandidates(),
+      getTagCandidates(["pending", "mapped"]),
       getTagBlacklist(),
     ]);
 
@@ -264,6 +304,26 @@ export function useTagManagerState(): TagManagerState {
   }, [blacklist, matchedBlacklist, showUnified, source]);
 
   const globalMatchCount = visibleTagLibrary.length + visibleCandidates.length + visibleBlacklist.length;
+
+  const highlightedTagIds = useMemo(() => {
+    if (highlightTagKeys.length === 0) {
+      return [];
+    }
+    const keys = new Set(highlightTagKeys);
+    return tagLibrary
+      .filter((item) => keys.has(normalize(item.name)))
+      .map((item) => item.id);
+  }, [highlightTagKeys, tagLibrary]);
+
+  const highlightedCandidateIds = useMemo(() => {
+    if (highlightCandidateKeys.length === 0) {
+      return [];
+    }
+    const keys = new Set(highlightCandidateKeys);
+    return candidates
+      .filter((item) => keys.has(normalize(item.name)))
+      .map((item) => item.id);
+  }, [candidates, highlightCandidateKeys]);
 
   const toggleSelection = (current: number[], id: number): number[] => {
     if (current.includes(id)) {
@@ -399,7 +459,17 @@ export function useTagManagerState(): TagManagerState {
 
     setSelectedCandidateIds([]);
     await refreshAll();
-    setToast({ tone: "success", message: `已审批 ${response.data.approved_candidates} 条候选。` });
+    const approvedCount = Number(response.data.approved_candidates ?? 0);
+    const linkedCount = Number(response.data.linked_relations ?? 0);
+    if (approvedCount <= 0 && linkedCount <= 0) {
+      setToast({ tone: "success", message: "所选候选未发生状态变化。" });
+      return;
+    }
+    if (approvedCount > 0) {
+      setToast({ tone: "success", message: `已审批 ${approvedCount} 条候选。` });
+      return;
+    }
+    setToast({ tone: "success", message: `已应用 ${linkedCount} 条标签关系。` });
   }, [mode, refreshAll, selectedCandidateIds, setFailure]);
 
   const rejectSelectedCandidates = useCallback(async () => {
@@ -470,6 +540,13 @@ export function useTagManagerState(): TagManagerState {
 
     setSelectedCandidateIds([]);
     await refreshAll();
+    if (
+      Number(response.data.blacklisted_candidates ?? 0) <= 0 &&
+      Number(response.data.blacklist_terms_added ?? 0) <= 0
+    ) {
+      setToast({ tone: "success", message: "所选候选未发生状态变化。" });
+      return;
+    }
     setToast({
       tone: "success",
       message: `已拉黑 ${response.data.blacklisted_candidates} 条候选。`,
@@ -499,6 +576,10 @@ export function useTagManagerState(): TagManagerState {
 
     setSelectedCandidateIds([]);
     await refreshAll();
+    if (Number(response.data.requeued ?? 0) <= 0) {
+      setToast({ tone: "success", message: "所选候选未发生状态变化。" });
+      return;
+    }
     setToast({ tone: "success", message: `已回退 ${response.data.requeued} 条候选。` });
   }, [mode, refreshAll, selectedCandidateIds, setFailure]);
 
@@ -539,6 +620,8 @@ export function useTagManagerState(): TagManagerState {
     visibleTagLibrary,
     visibleCandidates,
     visibleBlacklist,
+    highlightedTagIds,
+    highlightedCandidateIds,
     selectedTagIds,
     selectedCandidateIds,
     selectedBlacklistIds,

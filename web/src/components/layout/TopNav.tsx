@@ -4,6 +4,7 @@ type TopNavProps = {
   searchInput: string;
   onSearchChange: (value: string) => void;
   onPickLibrary: () => void;
+  onOpenSettings: () => void;
   canInteract: boolean;
 };
 
@@ -32,7 +33,7 @@ function ActionButton({
   );
 }
 
-export function TopNav({ searchInput, onSearchChange, onPickLibrary, canInteract }: TopNavProps) {
+export function TopNav({ searchInput, onSearchChange, onPickLibrary, onOpenSettings, canInteract }: TopNavProps) {
   return (
     <header className="flex h-[84px] items-center justify-between bg-[var(--color-card)] px-6" data-testid="top-nav">
       <label className="flex h-[42px] w-[620px] items-center gap-2 rounded-full bg-[#F3F4F6] px-[14px]">
@@ -47,7 +48,7 @@ export function TopNav({ searchInput, onSearchChange, onPickLibrary, canInteract
       </label>
 
       <div className="flex h-[84px] items-center gap-[10px]">
-        <ActionButton label="Tag Manager" disabled />
+        <ActionButton label="Tag Manager" disabled={!canInteract} onClick={onOpenSettings} />
         <ActionButton label="Select Library" dark disabled={!canInteract} onClick={onPickLibrary} />
       </div>
     </header>

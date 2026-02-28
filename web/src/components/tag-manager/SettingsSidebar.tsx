@@ -13,7 +13,6 @@ type ModuleStatus = {
     | "tag-manager"
     | "library-sources"
     | "feature-extraction"
-    | "model-management"
     | "ebook-mode"
     | "logs-analysis"
     | "data-backup";
@@ -24,12 +23,11 @@ type ModuleStatus = {
 
 const MODULES: ModuleStatus[] = [
   { key: "user-login", label: "用户登录", hint: "规划中" },
-  { key: "tag-manager", label: "标签管理", hint: "服务就绪/API待接入", module: "tag-manager" },
+  { key: "tag-manager", label: "标签管理", hint: "服务就绪/API接入", module: "tag-manager" },
   { key: "library-sources", label: "资源库来源", hint: "部分支持" },
-  { key: "feature-extraction", label: "特征提取", hint: "部分支持" },
-  { key: "model-management", label: "模型管理", hint: "工具可用/API待接入" },
+  { key: "feature-extraction", label: "特征提取", hint: "服务就绪/API接入", module: "feature-extraction" },
   { key: "ebook-mode", label: "电子书模式", hint: "规划中" },
-  { key: "logs-analysis", label: "日志分析", hint: "服务就绪/API待接入", module: "logs-analysis" },
+  { key: "logs-analysis", label: "日志分析", hint: "服务就绪/API接入", module: "logs-analysis" },
   { key: "data-backup", label: "数据与备份", hint: "规划中" },
 ];
 
@@ -121,7 +119,7 @@ export function SettingsSidebar({ brand, activeModule, onModuleChange }: Setting
             <div className="flex h-14 flex-col gap-[6px] rounded-xl bg-[#1A2431] px-[14px] py-2">
               <div className="flex h-5 items-center justify-between">
                 <span className="text-ellipsis font-sidebar text-[11px] font-semibold text-[#94A3B8]">
-                  Scanning /videos/library…
+                  后台任务状态（自动切换）
                 </span>
                 <span className="font-sidebar text-[11px] font-bold text-[#E5E7EB]">47%</span>
               </div>

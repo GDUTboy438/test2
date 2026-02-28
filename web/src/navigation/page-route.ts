@@ -9,6 +9,9 @@ export type AppRoute = {
 };
 
 function parseModule(input: string | null): SettingsModule {
+  if (input === "feature-extraction") {
+    return "feature-extraction";
+  }
   return input === "logs-analysis" ? "logs-analysis" : "tag-manager";
 }
 
@@ -21,6 +24,9 @@ export function readRouteFromUrl(): AppRoute {
   }
   if (page === "logs-analysis") {
     return { page: "settings", module: "logs-analysis" };
+  }
+  if (page === "feature-extraction") {
+    return { page: "settings", module: "feature-extraction" };
   }
   if (page === "settings") {
     return { page: "settings", module: parseModule(params.get(MODULE_KEY)) };
@@ -39,9 +45,10 @@ export function setRouteInUrl(route: AppRoute, replace = false): void {
     url.searchParams.delete(MODULE_KEY);
   }
 
-  if (!url.searchParams.has("mode")) {
-    url.searchParams.set("mode", "live");
-  }
+  const hasScene = url.searchParams.has("scene");
+  const currentMode = url.searchParams.get("mode");
+  const normalizedMode = currentMode === "visual" && hasScene ? "visual" : "live";
+  url.searchParams.set("mode", normalizedMode);
 
   const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
   if (replace) {

@@ -33,8 +33,9 @@ import type {
 const PAGE_SIZE = 20;
 
 function readMode(): UiMode {
-  const mode = new URLSearchParams(window.location.search).get("mode");
-  return mode === "visual" ? "visual" : "live";
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+  return mode === "visual" && params.has("scene") ? "visual" : "live";
 }
 
 function defaultScanState(): ScanProgressInfo {
@@ -175,6 +176,7 @@ export function useHomeState(): HomeState {
       return;
     }
 
+    setErrorMessage("");
     setLibrary(current.data);
 
     const tree = await getDirectoryTree(current.data);
@@ -210,10 +212,20 @@ export function useHomeState(): HomeState {
 
     if (!response.ok || !response.data) {
       setLoading(false);
+      if (response.error?.code === "NO_LIBRARY") {
+        setLibrary(null);
+        setTreeRoot(null);
+        setItems([]);
+        setSelectedDirectoryId("");
+        setSelectedVideoId(null);
+        setFailure("No library selected.");
+        return;
+      }
       setFailure(response.error?.message ?? "Failed to load videos.");
       return;
     }
 
+    setErrorMessage("");
     setItems(response.data);
     setLoading(false);
   }, [mode, library, debouncedSearch, selectedDirectoryId, setFailure]);
@@ -322,6 +334,7 @@ export function useHomeState(): HomeState {
     }
 
     setLibrary(selected.data);
+    setErrorMessage("");
     setSearchInput("");
     setSelectedVideoId(null);
 

@@ -17,6 +17,8 @@ type AccordionStackProps = {
   selectedTagIds: number[];
   selectedCandidateIds: number[];
   selectedBlacklistIds: number[];
+  highlightedTagIds: number[];
+  highlightedCandidateIds: number[];
   onSetSection: (section: TagSection) => void;
   onToggleTag: (id: number) => void;
   onToggleCandidate: (id: number) => void;
@@ -144,6 +146,19 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function candidateStatusLabel(status: TagCandidateItem["status"]): string {
+  if (status === "approved") {
+    return "已通过";
+  }
+  if (status === "blacklisted") {
+    return "已拉黑";
+  }
+  if (status === "mapped") {
+    return "已映射";
+  }
+  return "待审";
+}
+
 export function AccordionStack({
   activeSection,
   canInteract,
@@ -153,6 +168,8 @@ export function AccordionStack({
   selectedTagIds,
   selectedCandidateIds,
   selectedBlacklistIds,
+  highlightedTagIds,
+  highlightedCandidateIds,
   onSetSection,
   onToggleTag,
   onToggleCandidate,
@@ -169,6 +186,12 @@ export function AccordionStack({
   const tagLayout = useAutoRowCapacity();
   const candidateLayout = useAutoRowCapacity();
   const blacklistLayout = useAutoRowCapacity();
+
+  const highlightedTagSet = useMemo(() => new Set(highlightedTagIds), [highlightedTagIds]);
+  const highlightedCandidateSet = useMemo(
+    () => new Set(highlightedCandidateIds),
+    [highlightedCandidateIds],
+  );
 
   const tagRows = useMemo(
     () => chunkRows(tagLibrary, tagLayout.perRow),
@@ -226,6 +249,7 @@ export function AccordionStack({
                       onDelete={() => {
                         void onDeleteOneTag(item.id);
                       }}
+                      highlighted={highlightedTagSet.has(item.id)}
                     />
                   ))}
                 </div>
@@ -284,6 +308,8 @@ export function AccordionStack({
                       checked={selectedCandidateIds.includes(item.id)}
                       onToggle={() => onToggleCandidate(item.id)}
                       tone={item.status === "blacklisted" ? "blacklist" : "candidate"}
+                      statusLabel={candidateStatusLabel(item.status)}
+                      highlighted={highlightedCandidateSet.has(item.id)}
                     />
                   ))}
                 </div>

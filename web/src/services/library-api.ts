@@ -44,7 +44,7 @@ export async function pickLibrary(): Promise<ApiEnvelope<LibraryInfo>> {
 
 export async function getDirectoryTree(library: LibraryInfo): Promise<ApiEnvelope<DirectoryNode>> {
   const response = await requestApi<ApiDirectoryNode[]>("/directories", {
-    query: { path: "", depth: 2 },
+    query: { path: "", depth: 8 },
   });
   if (!response.ok || !response.data) {
     return {

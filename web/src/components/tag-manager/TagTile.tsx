@@ -8,6 +8,8 @@ type TagTileProps = {
   onDelete?: () => void;
   widthClass?: string;
   tone?: "library" | "candidate" | "blacklist";
+  statusLabel?: string;
+  highlighted?: boolean;
 };
 
 function toneClass(tone: TagTileProps["tone"]): string {
@@ -28,10 +30,16 @@ export function TagTile({
   onDelete,
   widthClass = "w-[216px]",
   tone = "library",
+  statusLabel,
+  highlighted = false,
 }: TagTileProps) {
+  const highlightClass = highlighted
+    ? "border-[#818CF8] bg-[#EEF2FF] shadow-[0_0_0_2px_rgba(129,140,248,0.35)]"
+    : "";
+
   return (
     <div
-      className={`flex h-11 ${widthClass} items-center justify-between rounded-[11px] border px-[12px] ${toneClass(tone)}`}
+      className={`flex h-11 ${widthClass} items-center justify-between rounded-[11px] border px-[12px] ${toneClass(tone)} ${highlightClass}`}
       data-testid="tag-tile"
     >
       <button
@@ -46,8 +54,15 @@ export function TagTile({
         >
           <Check size={12} strokeWidth={2.4} />
         </span>
-        <span className="text-ellipsis max-w-[120px] font-sidebar text-[13px] font-bold text-[#0F172A]">{label}</span>
+        <span className="text-ellipsis max-w-[120px] overflow-hidden whitespace-nowrap font-sidebar text-[13px] font-bold text-[#0F172A]">
+          {label}
+        </span>
         <span className="font-sidebar text-[12px] font-bold text-[#64748B]">{count}</span>
+        {statusLabel ? (
+          <span className="inline-flex h-5 items-center rounded-full border border-[#CBD5E1] bg-white px-[6px] font-sidebar text-[10px] font-bold text-[#475569]">
+            {statusLabel}
+          </span>
+        ) : null}
       </button>
 
       {onDelete ? (
